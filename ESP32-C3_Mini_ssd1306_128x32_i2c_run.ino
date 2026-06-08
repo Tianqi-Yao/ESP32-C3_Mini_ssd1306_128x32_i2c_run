@@ -8,25 +8,26 @@
 #include "WebServerHandler.h"
 #include <SD.h>
 
-// ========== ⏱️ 定时参数 ==========
+// ========== Pin & timing configuration ==========
 #define SDA_PIN             21
 #define SCL_PIN             20
 #define BTN_PIN             9
 #define LED_PIN             8
 #define POWER_LATCH_PIN     10
 
-#define TEMP_INTERVAL_MS        1 * 60000UL         // 每1分钟采集温湿度
-#define VOLTAGE_INTERVAL_MS     10 * 60000UL        // 每10分钟记录电压
-#define RECOVERY_CHECK_INTERVAL 1 * 60000UL         // 每1分钟检测静置电压是否恢复
+#define TEMP_INTERVAL_MS        1 * 60000UL         // Sample temperature/humidity every 1 min
+#define VOLTAGE_INTERVAL_MS     10 * 60000UL        // Log battery voltage every 10 min
+#define RECOVERY_CHECK_INTERVAL 1 * 60000UL         // Check resting-voltage recovery every 1 min
 
 #define POWER_ON_HOUR           6
 #define POWER_OFF_HOUR          20
-// 断电/恢复采用迟滞(hysteresis)：恢复阈值必须明显高于断电阈值，
-// 这样恢复供电后即使负载拉低电压，也不会立刻又跌破断电线 → 杜绝来回开关。
-#define LOW_POWER_THRESHOLD     14   // 4S LiFePO4：约14% SOC(静置约12.5V)即断电，保守护电池
-#define RECOVERY_PERCENT        40   // 静置电量充到约40%(4S约13.1V)即恢复供电，留足迟滞缓冲
+// Cutoff/recovery use hysteresis: the recovery threshold must be clearly higher than the
+// cutoff threshold, so that after power is restored the load sag will not immediately drop
+// back below the cutoff line -> prevents on/off oscillation.
+#define LOW_POWER_THRESHOLD     14   // 4S LiFePO4: cut power at ~14% SOC (~12.5V resting) to protect the battery
+#define RECOVERY_PERCENT        50   // Restore power once resting SOC reaches ~40% (~13.1V), leaving hysteresis margin
 
-// ========== 运行状态 ==========
+// ========== Runtime state ==========
 unsigned long lastTempLog = 0;
 unsigned long lastVoltLog = 0;
 unsigned long lastRecoveryCheck = 0;
@@ -35,14 +36,14 @@ bool isWiFiMode = false;
 
 bool powerOnTriggeredToday = false;
 bool powerOffTriggeredToday = false;
-int lastResetDay = -1;   // 上次清零开关机标志时的日期，用于跨天检测
+int lastResetDay = -1;   // Day-of-month at last flag reset, used for day-rollover detection
 
-// ========== 电压日志 ==========
+// ========== Voltage log ==========
 bool logVoltageStatus(float voltage, int percent) {
     String path = "/logs/voltage.csv";
     File file = SD.open(path, FILE_APPEND);
     if (!file) {
-        LOG("⚠️ 无法打开电压日志文件");
+        LOG("Failed to open voltage log file");
         return false;
     }
 
@@ -54,23 +55,23 @@ bool logVoltageStatus(float voltage, int percent) {
         voltage, percent);
     file.println(line);
     file.close();
-    LOG("🔋 电压记录: " + String(line));
+    LOG("Voltage logged: " + String(line));
     return true;
 }
 
 void waitForValidBatteryRead(int maxRetries = 20, int delayMs = 250) {
     for (int i = 0; i < maxRetries; ++i) {
         float voltage = readBatteryVoltage();
-        if (voltage > 1.0) {  // 电池电压大于1V基本可认为是有效
-            LOG("🔋 检测到有效电压: " + String(voltage, 2) + "V");
+        if (voltage > 1.0) {  // A reading above 1V is considered a valid battery measurement
+            LOG("Valid voltage detected: " + String(voltage, 2) + "V");
             return;
         }
         delay(delayMs);
     }
-    LOG("⚠️ 等待电压采集超时，电压仍异常");
+    LOG("Timed out waiting for a valid voltage reading");
 }
 
-// ========== 初始化 ==========
+// ========== Initialization ==========
 void setup() {
     Serial.begin(115200);
     delay(500);
@@ -85,23 +86,23 @@ void setup() {
     storageInit();
     initPowerLatch(POWER_LATCH_PIN);
 
-    LOG("✅ 所有模块初始化完成");
+    LOG("All modules initialized");
     waitForValidBatteryRead();
 
     float voltage = readBatteryVoltage();
     int percent = getBatteryPercentage(voltage);
     logVoltageStatus(voltage, percent);
-    LOG("📈 开机初始电压记录完毕: " + String(voltage, 2) + "V (" + String(percent) + "%)");
+    LOG("Initial voltage logged at boot: " + String(voltage, 2) + "V (" + String(percent) + "%)");
 }
 
-// ========== 主循环 ==========
+// ========== Main loop ==========
 void loop() {
     unsigned long now = millis();
     DateTime rtcNow = getCurrentDateTime();
 
     int hour = rtcNow.hour();
 
-    // 🌙 跨天清除开关机标志（按日期变化判定，不依赖瞬间时间窗口）
+    // Clear the daily power on/off flags on day rollover (by date change, not a time window)
     int today = rtcNow.day();
     if (today != lastResetDay) {
         lastResetDay = today;
@@ -109,7 +110,7 @@ void loop() {
         powerOffTriggeredToday = false;
     }
 
-    // 1️⃣ 每分钟采集温湿度
+    // 1) Sample temperature/humidity every minute
     if (now - lastTempLog >= TEMP_INTERVAL_MS || lastTempLog == 0) {
         lastTempLog = now;
         if (refreshSensorData()) {
@@ -119,16 +120,17 @@ void loop() {
         }
     }
 
-    // 2️⃣ 每10分钟记录电压
+    // 2) Log battery voltage every 10 minutes
     if (now - lastVoltLog >= VOLTAGE_INTERVAL_MS || lastVoltLog == 0) {
         lastVoltLog = now;
         float voltage = readBatteryVoltage();
         int percent = getBatteryPercentage(voltage);
         logVoltageStatus(voltage, percent);
 
-        // 仅在尚未处于低电关机时才触发断电，避免关机期间重复触发、打乱恢复计时
+        // Only trigger cutoff when not already in low-power shutdown, to avoid
+        // repeated triggering during shutdown and disrupting the recovery timer.
         if (!lowPowerShutdown && percent <= LOW_POWER_THRESHOLD) {
-            LOG("🛑 电量低(" + String(percent) + "%)，立即断电");
+            LOG("Low battery (" + String(percent) + "%), cutting power now");
             powerOff();
             lowPowerShutdown = true;
             lastRecoveryCheck = now;
@@ -136,56 +138,58 @@ void loop() {
         }
     }
 
-    // 3️⃣ 低电关机后：等电池(静置电压)充到恢复阈值就立刻恢复供电
-    //    关机时外部负载已断开，此处读到的即静置电压，最准最稳，无需先通电试探。
-    //    恢复阈值(40%)明显高于断电阈值(14%)，恢复后负载拉低电压也不会马上又断 → 不再来回开关。
+    // 3) After low-power shutdown: restore power as soon as the resting voltage reaches the recovery threshold.
+    //    During shutdown the external load is disconnected, so the reading here is the resting voltage:
+    //    the most accurate and stable measurement, with no need to power on first to probe.
+    //    The recovery threshold (40%) is well above the cutoff (14%), so load sag after recovery
+    //    will not immediately re-trigger the cutoff -> no more on/off oscillation.
     if (lowPowerShutdown && now - lastRecoveryCheck >= RECOVERY_CHECK_INTERVAL) {
         lastRecoveryCheck = now;
         int currentPercent = getBatteryPercentage();
         if (currentPercent >= RECOVERY_PERCENT) {
-            LOG("✅ 电量恢复到 " + String(currentPercent) + "%，恢复供电并继续采集");
+            LOG("Battery recovered to " + String(currentPercent) + "%, restoring power and resuming sampling");
             powerOn();
             lowPowerShutdown = false;
         }
     }
 
-    // 4️⃣ 定时开关机（每天仅触发一次，手动操作可覆盖至当天结束）
-    // 用「已到点且当天未触发」判定，而非卡 second<5 的瞬间窗口，
-    // 避免被同轮 loop 的 WiFi 扫描/SD 写入等阻塞操作跨过而错过。
+    // 4) Scheduled power on/off (triggers once per day; a manual action overrides it until end of day).
+    //    Uses "past the hour and not yet triggered today" instead of a narrow second<5 window,
+    //    so it cannot be missed when a blocking operation (WiFi scan / SD write) spans that instant.
     if (!lowPowerShutdown) {
         if (hour >= POWER_ON_HOUR && hour < POWER_OFF_HOUR && !powerOnTriggeredToday) {
-            LOG("⏰ 定时开机触发");
+            LOG("Scheduled power-on triggered");
             powerOn();
             powerOnTriggeredToday = true;
         }
         if (hour >= POWER_OFF_HOUR && !powerOffTriggeredToday) {
-            LOG("⏰ 定时关机触发");
+            LOG("Scheduled power-off triggered");
             powerOff();
             powerOffTriggeredToday = true;
         }
     }
 
-    // 5️⃣ 长按按钮进入 WiFi 模式
+    // 5) Long-press the button to enter WiFi mode
     ButtonEvent event = checkButtonEvent();
     if (event == LONG_PRESS && !isWiFiMode) {
-        LOG("📶 进入 WiFi 模式");
+        LOG("Entering WiFi mode");
         isWiFiMode = true;
         digitalWrite(LED_PIN, LOW);
         scanNetworks();
         startWiFiAndWeb();
     }
 
-    // 6️⃣ 处理网页请求与退出 WiFi 模式
+    // 6) Handle web requests and exit from WiFi mode
     if (isWiFiMode) {
         blinkLED(LED_PIN);
         handleClientRequests();
         if (shouldExitWiFiMode()) {
-            LOG("🔌 退出 WiFi 模式");
+            LOG("Exiting WiFi mode");
             stopWiFiAndWeb();
             isWiFiMode = false;
             digitalWrite(LED_PIN, HIGH);
         }
     }
 
-    delay(100);  // 避免资源爆满 & 提升响应
+    delay(100);  // Avoid saturating resources and improve responsiveness
 }

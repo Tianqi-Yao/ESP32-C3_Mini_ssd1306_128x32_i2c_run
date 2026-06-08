@@ -1,5 +1,5 @@
 #include "ButtonHandler.h"
-#include "StorageManager.h"  // 👈 引入 LOG 宏
+#include "StorageManager.h"  // for the LOG macro
 #include <Arduino.h>
 
 static int btnPin = -1;
@@ -9,13 +9,13 @@ static unsigned long pressStartTime = 0;
 static bool longPressHandled = false;
 
 const unsigned long DEBOUNCE_DELAY = 30;
-const unsigned long LONG_PRESS_DURATION = 3000; // 3 秒
+const unsigned long LONG_PRESS_DURATION = 3000; // 3 seconds
 
 void buttonInit(int buttonPin)
 {
     btnPin = buttonPin;
     pinMode(btnPin, INPUT_PULLUP);
-    LOG("✅ Button initialized.");
+    LOG("Button initialized.");
 }
 
 ButtonEvent checkButtonEvent()
@@ -36,7 +36,7 @@ ButtonEvent checkButtonEvent()
                 LOG("Button long pressed!");
                 return LONG_PRESS;
             }
-        } else { // 松开
+        } else { // released
             if (pressStartTime > 0 && !longPressHandled) {
                 LOG("Button short pressed!");
                 pressStartTime = 0;

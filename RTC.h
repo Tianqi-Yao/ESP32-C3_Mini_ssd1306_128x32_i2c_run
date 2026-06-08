@@ -3,14 +3,14 @@
 
 #include <RTClib.h>
 
-// 初始化 DS3231 RTC 模块，自动设置时间（如未初始化）
+// Initialize the DS3231 RTC module, auto-setting the time if uninitialized.
 bool rtcInit();
 
-// 获取当前时间的字符串表示（例如 "2025-04-30 14:36:11"）
+// Get the current time as a string (e.g. "2025-04-30 14:36:11").
 String getRTCTimeString();
 
-// 获取当前 RTC 时间对象
+// Get the current RTC time object.
 DateTime getCurrentDateTime();
 
-// 设置 RTC 时间为指定 DateTime（可用于手动同步）
+// Set the RTC to a specific DateTime (e.g. for manual sync).
 void setRTC(const DateTime& dt);

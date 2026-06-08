@@ -17,18 +17,18 @@ String sensorUI(float temp, float hum, float batteryVoltage, int batteryPercent,
                 }
                 function exitWiFiMode() {
                     fetch('/exit')
-                        .then(() => alert('✅ 已发送退出指令'))
-                        .catch(() => alert('❌ 发送失败'));
+                        .then(() => alert('Exit command sent'))
+                        .catch(() => alert('Failed to send'));
                 }
                 function powerOn() {
-                    fetch('/power-on').then(() => alert('⚡ Power ON'));
+                    fetch('/power-on').then(() => alert('Power ON'));
                 }
                 function powerOff() {
-                    fetch('/power-off').then(() => alert('⚡ Power OFF'));
+                    fetch('/power-off').then(() => alert('Power OFF'));
                 }
                 function syncRTCFromBrowser() {
                     const now = new Date();
-                    const localTime = now.toLocaleString('sv-SE').replace(' ', 'T'); // 例如 "2025-05-13T21:30:45.123Z"
+                    const localTime = now.toLocaleString('sv-SE').replace(' ', 'T'); // e.g. "2025-05-13T21:30:45"
 
                     fetch('/rtc-sync-browser', {
                         method: 'POST',
@@ -37,13 +37,13 @@ String sensorUI(float temp, float hum, float batteryVoltage, int batteryPercent,
                     })
                     .then(res => res.text())
                     .then(msg => alert(msg))
-                    .catch(() => alert("❌ 同步失败"));
+                    .catch(() => alert("Sync failed"));
                 }
                 function loadFileTree() {
                     fetch('/files')
                         .then(res => res.json())
                         .then(data => renderFileTree(data))
-                        .catch(() => alert("❌ 加载文件列表失败"));
+                        .catch(() => alert("Failed to load file list"));
                 }
 
                 function renderFileTree(tree, container = document.getElementById("fileTree")) {
@@ -55,7 +55,7 @@ String sensorUI(float temp, float hum, float batteryVoltage, int batteryPercent,
                         if (item.type === "file") {
                             li.innerHTML = `
                                 ${item.name}
-                                <button onclick="downloadFile('${item.path}')" style="margin-left:10px">⬇️</button>
+                                <button onclick="downloadFile('${item.path}')" style="margin-left:10px">Download</button>
                             `;
                             li.style.cursor = "pointer";
                             li.onclick = () => loadFileContent(item.path);
@@ -101,11 +101,11 @@ String sensorUI(float temp, float hum, float batteryVoltage, int batteryPercent,
                             collectLogs(data);
 
                             if (logFiles.length === 0) {
-                                alert("⚠️ 没有找到任何日志文件");
+                                alert("No log files found");
                                 return;
                             }
 
-                            // 顺序下载所有日志文件
+                            // Download all log files in sequence
                             logFiles.forEach(path => {
                                 const link = document.createElement('a');
                                 link.href = `/download?path=${encodeURIComponent(path)}`;
@@ -115,7 +115,7 @@ String sensorUI(float temp, float hum, float batteryVoltage, int batteryPercent,
                                 document.body.removeChild(link);
                             });
                         })
-                        .catch(() => alert("❌ 无法获取文件列表"));
+                        .catch(() => alert("Failed to fetch file list"));
                 }
 
                 function loadFileContent(path) {
@@ -126,31 +126,31 @@ String sensorUI(float temp, float hum, float batteryVoltage, int batteryPercent,
                         });
                 }
                 function formatSDCard() {
-                    if (confirm("⚠️ 确定要清空 SD 卡日志吗？此操作不可恢复")) {
+                    if (confirm("Clear all SD card logs? This cannot be undone.")) {
                         fetch('/format-sd')
                             .then(res => res.text())
                             .then(msg => alert(msg))
-                            .catch(() => alert("❌ 操作失败"));
+                            .catch(() => alert("Operation failed"));
                     }
                 }
             </script>
         </head>
         <body>
-            <h1>📊 ESP32 状态面板</h1>
-            <p><strong>温度：</strong> )rawliteral" + String(temp) + R"rawliteral( °C</p>
-            <p><strong>湿度：</strong> )rawliteral" + String(hum) + R"rawliteral( %</p>
-            <p><strong>电池电压：</strong> )rawliteral" + String(batteryVoltage, 2) + R"rawliteral( V（)rawliteral" + String(batteryPercent) + R"rawliteral( %）</p>
-            <p><strong>当前时间：</strong> )rawliteral" + timeStr + R"rawliteral(</p>
+            <h1>ESP32 Status Panel</h1>
+            <p><strong>Temperature:</strong> )rawliteral" + String(temp) + R"rawliteral( C</p>
+            <p><strong>Humidity:</strong> )rawliteral" + String(hum) + R"rawliteral( %</p>
+            <p><strong>Battery voltage:</strong> )rawliteral" + String(batteryVoltage, 2) + R"rawliteral( V ()rawliteral" + String(batteryPercent) + R"rawliteral( %)</p>
+            <p><strong>Current time:</strong> )rawliteral" + timeStr + R"rawliteral(</p>
 
-            <button onclick="refreshPage()">🔄 刷新</button>
-            <button onclick="downloadAllLogs()">⬇️ 下载全部日志文件</button>
-            <button onclick="powerOn()">⚡ Power ON</button>
-            <button onclick="powerOff()">🛑 Power OFF</button>
-            <button onclick="formatSDCard()">🗑️ 清空 SD 卡日志</button>
-            <button onclick="syncRTCFromBrowser()">🕒 用手机时间校准 RTC</button>
-            <button onclick="exitWiFiMode()">🔌 退出 WiFi 模式</button>
+            <button onclick="refreshPage()">Refresh</button>
+            <button onclick="downloadAllLogs()">Download all logs</button>
+            <button onclick="powerOn()">Power ON</button>
+            <button onclick="powerOff()">Power OFF</button>
+            <button onclick="formatSDCard()">Clear SD logs</button>
+            <button onclick="syncRTCFromBrowser()">Sync RTC with phone time</button>
+            <button onclick="exitWiFiMode()">Exit WiFi mode</button>
 
-            <h2>📁 SD 卡文件浏览器</h2>
+            <h2>SD Card File Browser</h2>
             <div id="fileTree" style="max-height: 300px; overflow: auto; border: 1px solid #ccc; padding: 10px;"></div>
             <pre id="fileContent" style="white-space: pre-wrap; border: 1px solid #ccc; padding: 10px; margin-top: 10px;"></pre>
             <script>

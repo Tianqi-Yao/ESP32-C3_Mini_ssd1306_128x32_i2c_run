@@ -7,5 +7,5 @@ bool saveTemperatureHumidityWithTime(float temp, float hum);
 String getTodayLogPath();
 bool logMessage(const String& message);
 
-// 加一个全局宏：
+// Global logging macro: print to serial and append to the SD log file.
 #define LOG(msg) do { Serial.println(msg); logMessage(msg); } while(0)

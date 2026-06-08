@@ -1,16 +1,16 @@
 #include "SensorManager.h"
-#include "StorageManager.h"  // 👈 引入 LOG 宏
+#include "StorageManager.h"  // for the LOG macro
 #include <Adafruit_SHT31.h>
 
-// SHT35 对象
+// SHT35 object
 static Adafruit_SHT31 sht31 = Adafruit_SHT31();
 
-// 当前温湿度缓存值
+// Cached current temperature/humidity values
 static float currentTemp = NAN;
 static float currentHum = NAN;
-static bool sensorReady = false; // 标记是否初始化成功
+static bool sensorReady = false; // whether initialization succeeded
 
-// 初始化传感器（主程序需先调用 Wire.begin）
+// Initialize the sensor (the main program must call Wire.begin first).
 bool sensorInit()
 {
     if (!sht31.begin(0x44)) {
@@ -23,7 +23,7 @@ bool sensorInit()
     return true;
 }
 
-// 刷新一次传感器数据，返回是否成功
+// Refresh sensor data once; returns whether it succeeded.
 bool refreshSensorData()
 {
     if (!sensorReady) {
@@ -46,6 +46,6 @@ bool refreshSensorData()
     return true;
 }
 
-// 获取当前温湿度值
+// Get the current temperature/humidity values.
 float getTemperature() { return currentTemp; }
 float getHumidity()    { return currentHum; }

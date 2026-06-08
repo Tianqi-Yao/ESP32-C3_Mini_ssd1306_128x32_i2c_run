@@ -1,13 +1,22 @@
 #include "BatteryMonitor.h"
-#include "StorageManager.h" // 👈 引入 LOG 宏
+#include "StorageManager.h" // for the LOG macro
 #include <Arduino.h>
 
-const int BATTERY_ADC_PIN = 0;         // GPIO0 = ADC1_CH0（实际接线引脚）
-const float VOLTAGE_DIVIDER_RATIO = 43.0 / 10.0;  // 上臂33k + 下臂10k 分压，比值 4.3
+const int BATTERY_ADC_PIN = 0;         // GPIO0 = ADC1_CH0 (actual wiring pin)
+// Physical divider is 33k/10k = 4.33, but near full charge the tap voltage (~3.1V) exceeds the
+// ESP32-C3 ADC's reliable linear range and the ADC reads low (high-end compression).
+// Multimeter calibration at full charge: true battery 13.42V, true tap 3.097V, but the ADC
+// reports only 2.912V (~0.19V low). So the ratio is set to the empirical 13.42/2.912 = 4.61,
+// anchoring the full-charge end (the LiFePO4 operating band is narrow).
+// Note: this single-point calibration may read slightly high at the low end, so cutoff triggers a
+// little late (fine with a BMS). For full-range accuracy add a low-charge point (two-point cal);
+// the clean hardware fix is lower resistor 10k -> 6.8k (ratio ~5.85, tap <2.5V). See README.
+const float VOLTAGE_DIVIDER_RATIO = 4.61;
 
-// 4S LiFePO4（“12V”磷酸铁锂，4×3.2V 标称）静置开路电压 -> 剩余电量% 分段表。
-// 注意：LiFePO4 放电曲线极平，中段(20%~90%)电压几乎不变，仅靠电压估 SOC 在中段
-// 本就不精确；且应以静置电压为准（带负载时电压下垂会偏低）。表值由高到低，线性插值。
+// 4S LiFePO4 ("12V" lithium iron phosphate, 4x3.2V nominal): resting open-circuit voltage -> SOC% table.
+// Note: the LiFePO4 discharge curve is very flat; in the mid range (20%-90%) the voltage barely
+// changes, so voltage-based SOC is inherently imprecise there. Readings should be taken at rest
+// (voltage sags under load and reads low). Entries are high-to-low; values are linearly interpolated.
 struct SocPoint { float voltage; int percent; };
 static const SocPoint SOC_TABLE[] = {
     {13.60, 100},
@@ -24,24 +33,25 @@ static const SocPoint SOC_TABLE[] = {
 };
 static const int SOC_TABLE_LEN = sizeof(SOC_TABLE) / sizeof(SOC_TABLE[0]);
 
-// ADC采样优化-使用多次平均值（滤掉抖动）。
-// analogReadMilliVolts 内部已套用 eFuse 出厂校准，返回管脚处实测毫伏。
+// Averaged ADC sampling (filters out jitter).
+// analogReadMilliVolts applies the factory eFuse calibration internally and returns the
+// measured millivolts at the pin.
 float readADC_AveragedMillivolts(int pin, int samples = 16) {
     long sum = 0;
     for (int i = 0; i < samples; ++i) {
         sum += analogReadMilliVolts(pin);
-        delayMicroseconds(1000);  // 稳定性更高
+        delayMicroseconds(1000);  // improves stability
     }
     return (float)sum / samples;
 }
 
 float readBatteryVoltage() {
-    float mv = readADC_AveragedMillivolts(BATTERY_ADC_PIN, 16); // 16次平均值（管脚处毫伏）
-    float voltage12v = (mv / 1000.0) * VOLTAGE_DIVIDER_RATIO;   // 还原分压前的实际电压
+    float mv = readADC_AveragedMillivolts(BATTERY_ADC_PIN, 16); // average of 16 samples (millivolts at pin)
+    float voltage12v = (mv / 1000.0) * VOLTAGE_DIVIDER_RATIO;   // undo the divider to get the real voltage
     return voltage12v;
 }
 
-// 由已读到的电压估算电量，避免重复触发 ADC 采样
+// Estimate SOC from an already-read voltage, avoiding a redundant ADC sample.
 int getBatteryPercentage(float voltage) {
     if (voltage >= SOC_TABLE[0].voltage) return SOC_TABLE[0].percent;
     if (voltage <= SOC_TABLE[SOC_TABLE_LEN - 1].voltage) return SOC_TABLE[SOC_TABLE_LEN - 1].percent;
@@ -59,7 +69,7 @@ int getBatteryPercentage(float voltage) {
     return 0;
 }
 
-// 便捷封装：自行读取一次电压再估算（保留旧调用方式）
+// Convenience wrapper: read the voltage once and estimate (keeps the old call style).
 int getBatteryPercentage() {
     return getBatteryPercentage(readBatteryVoltage());
 }

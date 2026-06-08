@@ -1,5 +1,5 @@
 #include "RTC.h"
-#include "StorageManager.h" // 👈 引入 LOG 宏
+#include "StorageManager.h" // for the LOG macro
 #include <Wire.h>
 #include <RTClib.h>
 
@@ -9,17 +9,17 @@ bool rtcInit()
 {
     if (!rtc.begin())
     {
-        LOG("❌ RTC not found!");
+        LOG("RTC not found!");
         return false;
     }
 
     if (rtc.lostPower())
     {
-        LOG("⚠️ RTC lost power, setting to compile time.");
-        rtc.adjust(DateTime(F(__DATE__), F(__TIME__))); // 使用编译时间初始化
+        LOG("RTC lost power, setting to compile time.");
+        rtc.adjust(DateTime(F(__DATE__), F(__TIME__))); // initialize with compile time
     }
 
-    LOG("✅ RTC initialized.");
+    LOG("RTC initialized.");
     return true;
 }
 
@@ -41,5 +41,5 @@ DateTime getCurrentDateTime()
 void setRTC(const DateTime &dt)
 {
     rtc.adjust(dt);
-    LOG("⏱️ RTC time updated manually.");
+    LOG("RTC time updated manually.");
 }

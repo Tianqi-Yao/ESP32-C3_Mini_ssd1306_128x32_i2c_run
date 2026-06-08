@@ -19,7 +19,7 @@ bool storageInit()
 
     if (!SD.begin(SD_CS, spi)) {
 #if STORAGE_DEBUG
-        LOG("❌ SD card initialization failed.");
+        LOG("SD card initialization failed.");
 #endif
         return false;
     }
@@ -27,7 +27,7 @@ bool storageInit()
     SD.mkdir(LOG_DIR);
     storageReady = true;
 #if STORAGE_DEBUG
-    LOG("✅ SD card ready.");
+    LOG("SD card ready.");
 #endif
     return true;
 }
@@ -45,7 +45,7 @@ bool saveTemperatureHumidityWithTime(float temp, float hum)
 {
     if (!storageReady || isnan(temp) || isnan(hum)) {
 #if STORAGE_DEBUG
-        LOG("⚠️ Skip saving: SD not ready or invalid data.");
+        LOG("Skip saving: SD not ready or invalid data.");
 #endif
         return false;
     }
@@ -60,7 +60,7 @@ bool saveTemperatureHumidityWithTime(float temp, float hum)
     File file = SD.open(getTodayLogPath().c_str(), FILE_APPEND);
     if (!file) {
 #if STORAGE_DEBUG
-        LOG("❌ Failed to open log file.");
+        LOG("Failed to open log file.");
 #endif
         return false;
     }
@@ -69,7 +69,7 @@ bool saveTemperatureHumidityWithTime(float temp, float hum)
     file.close();
 
 #if STORAGE_DEBUG
-    LOG("💾 Data saved: " + String(line));
+    LOG("Data saved: " + String(line));
 #endif
 
     return true;
@@ -78,24 +78,24 @@ bool saveTemperatureHumidityWithTime(float temp, float hum)
 bool logMessage(const String& message)
 {
     if (!storageReady) {
-        Serial.println("⚠️ Cannot log message, SD not ready.");
+        Serial.println("Cannot log message, SD not ready.");
         return false;
     }
 
     DateTime now = getCurrentDateTime();
 
-    // 按日期命名日志文件
+    // Name the log file by date
     char filename[32];
     snprintf(filename, sizeof(filename), "/logs/systemLog_%04d-%02d-%02d.txt",
              now.year(), now.month(), now.day());
 
     File file = SD.open(filename, FILE_APPEND);
     if (!file) {
-        Serial.println("❌ Failed to open system log file.");
+        Serial.println("Failed to open system log file.");
         return false;
     }
 
-    // 写入带时间戳的日志行
+    // Write a timestamped log line
     char timestamp[32];
     snprintf(timestamp, sizeof(timestamp), "[%02d:%02d:%02d]",
              now.hour(), now.minute(), now.second());
@@ -106,4 +106,3 @@ bool logMessage(const String& message)
     file.close();
     return true;
 }
-

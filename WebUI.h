@@ -1,5 +1,5 @@
 #pragma once
 #include <Arduino.h>
 
-// 返回网页 HTML 字符串，展示传感器状态
+// Returns the HTML string showing the sensor/battery status panel.
 String sensorUI(float temp, float hum, float batteryVoltage, int batteryPercent, const String& timeStr);

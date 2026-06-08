@@ -2,4 +2,4 @@
 
 void initPowerLatch(int powerLatchPin);
 void powerOn();
-void powerOff(); // 断电
+void powerOff(); // cut power
