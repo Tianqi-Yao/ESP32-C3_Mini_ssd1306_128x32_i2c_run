@@ -17,6 +17,11 @@ const char* password = "12345678";
 WebServer server(80);
 bool exitRequested = false;
 
+// 路径白名单：只允许访问 /logs/ 下的文件，禁止目录穿越
+static bool isAllowedPath(const String& p) {
+    return p.startsWith("/logs/") && p.indexOf("..") < 0;
+}
+
 void handleFileDownload() {
     if (!server.hasArg("path")) {
         server.send(400, "text/plain", "❌ 缺少 path 参数");
@@ -24,6 +29,11 @@ void handleFileDownload() {
     }
 
     String path = server.arg("path");
+    if (!isAllowedPath(path)) {
+        server.send(403, "text/plain", "❌ 路径不允许");
+        LOG("⛔ WebServer: 拒绝越权下载: " + path);
+        return;
+    }
     File file = SD.open(path, FILE_READ);
     if (!file || file.isDirectory()) {
         server.send(404, "text/plain", "❌ 文件不存在或是目录");
@@ -40,7 +50,7 @@ void listFilesRecursively(File dir, JsonArray arr, String path = "") {
         File entry = dir.openNextFile();
         if (!entry) break;
 
-        JsonObject obj = arr.createNestedObject();
+        JsonObject obj = arr.add<JsonObject>();
         String name = entry.name();
         String fullPath = path + "/" + name;
         obj["name"] = name;
@@ -48,7 +58,7 @@ void listFilesRecursively(File dir, JsonArray arr, String path = "") {
         obj["type"] = entry.isDirectory() ? "dir" : "file";
 
         if (entry.isDirectory()) {
-            JsonArray children = obj.createNestedArray("children");
+            JsonArray children = obj["children"].to<JsonArray>();
             listFilesRecursively(entry, children, fullPath);
         }
         entry.close();
@@ -56,10 +66,15 @@ void listFilesRecursively(File dir, JsonArray arr, String path = "") {
 }
 
 void handleListFiles() {
-    DynamicJsonDocument doc(4096);
+    JsonDocument doc;  // 7.x 弹性文档，按需增长
     JsonArray root = doc.to<JsonArray>();
 
     File rootDir = SD.open("/");
+    if (!rootDir) {
+        server.send(500, "text/plain", "❌ 无法打开 SD 根目录");
+        LOG("❌ WebServer: 无法打开 SD 根目录");
+        return;
+    }
     listFilesRecursively(rootDir, root);
     rootDir.close();
 
@@ -76,6 +91,11 @@ void handleReadFile() {
     }
 
     String path = server.arg("path");
+    if (!isAllowedPath(path)) {
+        server.send(403, "text/plain", "❌ 路径不允许");
+        LOG("⛔ WebServer: 拒绝越权读取: " + path);
+        return;
+    }
     File file = SD.open(path);
     if (!file || file.isDirectory()) {
         server.send(404, "text/plain", "❌ 文件不存在或是文件夹");
@@ -83,19 +103,16 @@ void handleReadFile() {
         return;
     }
 
-    String content;
-    while (file.available()) {
-        content += (char)file.read();
-    }
+    // 流式输出，避免大文件拼成 String 撑爆内存导致重启
+    server.streamFile(file, "text/plain");
     file.close();
-    server.send(200, "text/plain", content);
 }
 
 void handleRoot() {
     float temp = getTemperature();
     float hum = getHumidity();
     float batteryVoltage = readBatteryVoltage();
-    int batteryPercent = getBatteryPercentage();
+    int batteryPercent = getBatteryPercentage(batteryVoltage);
     String timeStr = getRTCTimeString();
     String html = sensorUI(temp, hum, batteryVoltage, batteryPercent, timeStr);
     server.send(200, "text/html", html);
@@ -125,7 +142,7 @@ void handleRTCSyncFromBrowser() {
     }
 
     String body = server.arg("plain");
-    DynamicJsonDocument doc(256);
+    JsonDocument doc;
     DeserializationError err = deserializeJson(doc, body);
 
     if (err) {

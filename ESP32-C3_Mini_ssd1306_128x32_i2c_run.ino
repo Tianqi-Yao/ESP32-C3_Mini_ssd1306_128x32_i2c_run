@@ -17,24 +17,25 @@
 
 #define TEMP_INTERVAL_MS        1 * 60000UL         // 每1分钟采集温湿度
 #define VOLTAGE_INTERVAL_MS     10 * 60000UL        // 每10分钟记录电压
-#define RECOVERY_CHECK_INTERVAL 1 * 60000UL         // 每1分钟检测电压恢复
-#define POWER_RETRY_INTERVAL    3UL * 3600000UL     // 每3小时尝试上电一次
+#define RECOVERY_CHECK_INTERVAL 1 * 60000UL         // 每1分钟检测静置电压是否恢复
 
 #define POWER_ON_HOUR           6
 #define POWER_OFF_HOUR          20
-#define LOW_POWER_THRESHOLD     0
-#define RECOVERY_PERCENT        95
+// 断电/恢复采用迟滞(hysteresis)：恢复阈值必须明显高于断电阈值，
+// 这样恢复供电后即使负载拉低电压，也不会立刻又跌破断电线 → 杜绝来回开关。
+#define LOW_POWER_THRESHOLD     14   // 4S LiFePO4：约14% SOC(静置约12.5V)即断电，保守护电池
+#define RECOVERY_PERCENT        40   // 静置电量充到约40%(4S约13.1V)即恢复供电，留足迟滞缓冲
 
 // ========== 运行状态 ==========
 unsigned long lastTempLog = 0;
 unsigned long lastVoltLog = 0;
-unsigned long lastPowerRetry = 0;
 unsigned long lastRecoveryCheck = 0;
 bool lowPowerShutdown = false;
 bool isWiFiMode = false;
 
 bool powerOnTriggeredToday = false;
 bool powerOffTriggeredToday = false;
+int lastResetDay = -1;   // 上次清零开关机标志时的日期，用于跨天检测
 
 // ========== 电压日志 ==========
 bool logVoltageStatus(float voltage, int percent) {
@@ -88,7 +89,7 @@ void setup() {
     waitForValidBatteryRead();
 
     float voltage = readBatteryVoltage();
-    int percent = getBatteryPercentage();
+    int percent = getBatteryPercentage(voltage);
     logVoltageStatus(voltage, percent);
     LOG("📈 开机初始电压记录完毕: " + String(voltage, 2) + "V (" + String(percent) + "%)");
 }
@@ -99,18 +100,17 @@ void loop() {
     DateTime rtcNow = getCurrentDateTime();
 
     int hour = rtcNow.hour();
-    int minute = rtcNow.minute();
-    int second = rtcNow.second();
 
-    // 🌙 每天凌晨清除开关机标志
-    if (hour == 0 && minute == 0 && second < 5) {
+    // 🌙 跨天清除开关机标志（按日期变化判定，不依赖瞬间时间窗口）
+    int today = rtcNow.day();
+    if (today != lastResetDay) {
+        lastResetDay = today;
         powerOnTriggeredToday = false;
         powerOffTriggeredToday = false;
     }
 
     // 1️⃣ 每分钟采集温湿度
     if (now - lastTempLog >= TEMP_INTERVAL_MS || lastTempLog == 0) {
-        LOG("🟢 进入温湿度采集...");
         lastTempLog = now;
         if (refreshSensorData()) {
             float temp = getTemperature();
@@ -121,56 +121,44 @@ void loop() {
 
     // 2️⃣ 每10分钟记录电压
     if (now - lastVoltLog >= VOLTAGE_INTERVAL_MS || lastVoltLog == 0) {
-        LOG("🟢 进入记录电压数据...");
         lastVoltLog = now;
         float voltage = readBatteryVoltage();
-        int percent = getBatteryPercentage();
+        int percent = getBatteryPercentage(voltage);
         logVoltageStatus(voltage, percent);
 
-        if (percent <= LOW_POWER_THRESHOLD) {
-            LOG("🛑 电量为0%，立即断电");
+        // 仅在尚未处于低电关机时才触发断电，避免关机期间重复触发、打乱恢复计时
+        if (!lowPowerShutdown && percent <= LOW_POWER_THRESHOLD) {
+            LOG("🛑 电量低(" + String(percent) + "%)，立即断电");
             powerOff();
             lowPowerShutdown = true;
-            lastPowerRetry = now;
             lastRecoveryCheck = now;
             return;
         }
     }
 
-    // 3️⃣ 低电关机后尝试恢复
+    // 3️⃣ 低电关机后：等电池(静置电压)充到恢复阈值就立刻恢复供电
+    //    关机时外部负载已断开，此处读到的即静置电压，最准最稳，无需先通电试探。
+    //    恢复阈值(40%)明显高于断电阈值(14%)，恢复后负载拉低电压也不会马上又断 → 不再来回开关。
     if (lowPowerShutdown && now - lastRecoveryCheck >= RECOVERY_CHECK_INTERVAL) {
-        LOG("🟢 进入低电状态恢复检查...");
         lastRecoveryCheck = now;
-        unsigned long sinceLastRetry = now - lastPowerRetry;
         int currentPercent = getBatteryPercentage();
-
-        if (sinceLastRetry >= POWER_RETRY_INTERVAL) {
-            LOG("⚡️ 到时间，尝试通电...");
-            powerOn();
-            delay(3000);
-            currentPercent = getBatteryPercentage();
-            if (currentPercent <= LOW_POWER_THRESHOLD) {
-                LOG("🔋 电量仍为0%，继续断电");
-                powerOff();
-            } else {
-                LOG("✅ 电量恢复，退出低电状态");
-                lowPowerShutdown = false;
-            }
-        } else if (currentPercent >= RECOVERY_PERCENT) {
-            LOG("⚡️ 电量 " + String(currentPercent) + "%，提前恢复供电");
+        if (currentPercent >= RECOVERY_PERCENT) {
+            LOG("✅ 电量恢复到 " + String(currentPercent) + "%，恢复供电并继续采集");
             powerOn();
             lowPowerShutdown = false;
         }
     }
 
-    // 4️⃣ 定时开关机（仅触发一次）
+    // 4️⃣ 定时开关机（每天仅触发一次，手动操作可覆盖至当天结束）
+    // 用「已到点且当天未触发」判定，而非卡 second<5 的瞬间窗口，
+    // 避免被同轮 loop 的 WiFi 扫描/SD 写入等阻塞操作跨过而错过。
     if (!lowPowerShutdown) {
-        if (hour == POWER_ON_HOUR && minute == 0 && second < 5 && !powerOnTriggeredToday) {
+        if (hour >= POWER_ON_HOUR && hour < POWER_OFF_HOUR && !powerOnTriggeredToday) {
             LOG("⏰ 定时开机触发");
             powerOn();
             powerOnTriggeredToday = true;
         }
-        if (hour == POWER_OFF_HOUR && minute == 0 && second < 5 && !powerOffTriggeredToday) {
+        if (hour >= POWER_OFF_HOUR && !powerOffTriggeredToday) {
             LOG("⏰ 定时关机触发");
             powerOff();
             powerOffTriggeredToday = true;
