@@ -4,10 +4,12 @@
 #include <RTClib.h>
 
 static RTC_DS3231 rtc;
+static bool rtcBeginOk = false;  // whether rtc.begin() succeeded
 
 bool rtcInit()
 {
-    if (!rtc.begin())
+    rtcBeginOk = rtc.begin();
+    if (!rtcBeginOk)
     {
         LOG("RTC not found!");
         return false;
@@ -21,6 +23,16 @@ bool rtcInit()
 
     LOG("RTC initialized.");
     return true;
+}
+
+// Whether the RTC is usable and reporting a plausible time. Everything time-dependent
+// (scheduling, day rollover, log filenames/timestamps) should gate on this so that a
+// missing/dead RTC degrades safely instead of acting on garbage time.
+bool isRtcValid()
+{
+    if (!rtcBeginOk) return false;
+    int year = rtc.now().year();
+    return (year >= 2024 && year <= 2099);
 }
 
 String getRTCTimeString()

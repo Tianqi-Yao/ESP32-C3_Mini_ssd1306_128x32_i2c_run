@@ -144,11 +144,38 @@ During shutdown the external load is disconnected, so the measured voltage is th
 (accurate and stable). Tune `RECOVERY_PERCENT` higher to be safer against oscillation, or lower to
 resume sooner.
 
+## Reliability
+
+The device is built to run unattended for long periods, so two safeguards protect against lockups
+and clock failures:
+
+### Watchdog
+A task watchdog (`esp_task_wdt`) is enabled at the end of `setup()` with a 30s timeout and fed at the
+top of every `loop()` iteration. If the loop ever hangs (SD/I2C/WiFi lockup), the watchdog triggers a
+reset and the device reboots automatically instead of freezing until a manual power cycle. The timeout
+is wider than the longest legitimate blocking call (`WiFi.scanNetworks()`, a few seconds). The init is
+compatible with both arduino-esp32 core 2.x and 3.x (selected via `ESP_ARDUINO_VERSION_MAJOR`).
+
+### RTC failure degradation
+All time-dependent behavior keys off the DS3231 RTC, so a missing/dead RTC is handled defensively via
+`isRtcValid()` (RTC began successfully and reports a year in 2024-2099):
+- Scheduled power on/off and the daily flag reset are **paused** when the RTC is invalid, so power is
+  never toggled on garbage time. A throttled warning is logged (at most once per minute).
+- Log filenames and timestamps fall back to `unknown-date.csv` / `systemLog_unknown.txt` and zeroed
+  timestamps, instead of scattering garbage-dated files across the card.
+- `millis()`-based sampling, voltage logging, and low-power protection are **unaffected** and keep
+  running, since they do not depend on the RTC.
+- Init failures (`rtcInit` / `sensorInit` / `storageInit`) are logged loudly at boot instead of being
+  silent.
+
 ## Data formats
 
 - `/logs/<YYYY-MM-DD>.csv` -- temperature/humidity: `date,time,temp,humidity`
-- `/logs/voltage.csv` -- battery: `date,time,voltage,percent`
+- `/logs/voltage_<YYYY-MM>.csv` -- battery (rotated monthly): `date,time,voltage,percent`
 - `/logs/systemLog_<YYYY-MM-DD>.txt` -- timestamped system log lines
+
+When the RTC time is invalid, dated names fall back to `unknown-date.csv`, `voltage_unknown.csv`,
+and `systemLog_unknown.txt`.
 
 ## Project structure
 

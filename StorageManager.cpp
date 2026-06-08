@@ -34,6 +34,11 @@ bool storageInit()
 
 String getTodayLogPath()
 {
+    // Fall back to a fixed name when the RTC time is invalid, so a dead RTC does not
+    // scatter hundreds of garbage-dated files onto the card.
+    if (!isRtcValid()) {
+        return String(LOG_DIR) + "/unknown-date.csv";
+    }
     DateTime now = getCurrentDateTime();
     char buf[32];
     snprintf(buf, sizeof(buf), "%s/%04d-%02d-%02d.csv",
@@ -50,12 +55,17 @@ bool saveTemperatureHumidityWithTime(float temp, float hum)
         return false;
     }
 
-    DateTime now = getCurrentDateTime();
     char line[64];
-    snprintf(line, sizeof(line), "%04d-%02d-%02d,%02d:%02d:%02d,%.2f,%.2f",
-            now.year(), now.month(), now.day(),
-            now.hour(), now.minute(), now.second(),
-            temp, hum);
+    if (isRtcValid()) {
+        DateTime now = getCurrentDateTime();
+        snprintf(line, sizeof(line), "%04d-%02d-%02d,%02d:%02d:%02d,%.2f,%.2f",
+                now.year(), now.month(), now.day(),
+                now.hour(), now.minute(), now.second(),
+                temp, hum);
+    } else {
+        // RTC time invalid: write zeroed timestamp columns instead of garbage
+        snprintf(line, sizeof(line), "0000-00-00,00:00:00,%.2f,%.2f", temp, hum);
+    }
 
     File file = SD.open(getTodayLogPath().c_str(), FILE_APPEND);
     if (!file) {
@@ -82,12 +92,17 @@ bool logMessage(const String& message)
         return false;
     }
 
+    bool rtcOk = isRtcValid();
     DateTime now = getCurrentDateTime();
 
-    // Name the log file by date
-    char filename[32];
-    snprintf(filename, sizeof(filename), "/logs/systemLog_%04d-%02d-%02d.txt",
-             now.year(), now.month(), now.day());
+    // Name the log file by date, falling back to a fixed name when the RTC time is invalid.
+    char filename[40];
+    if (rtcOk) {
+        snprintf(filename, sizeof(filename), "/logs/systemLog_%04d-%02d-%02d.txt",
+                 now.year(), now.month(), now.day());
+    } else {
+        snprintf(filename, sizeof(filename), "/logs/systemLog_unknown.txt");
+    }
 
     File file = SD.open(filename, FILE_APPEND);
     if (!file) {
@@ -95,10 +110,14 @@ bool logMessage(const String& message)
         return false;
     }
 
-    // Write a timestamped log line
+    // Write a timestamped log line (zeros when the RTC time is invalid)
     char timestamp[32];
-    snprintf(timestamp, sizeof(timestamp), "[%02d:%02d:%02d]",
-             now.hour(), now.minute(), now.second());
+    if (rtcOk) {
+        snprintf(timestamp, sizeof(timestamp), "[%02d:%02d:%02d]",
+                 now.hour(), now.minute(), now.second());
+    } else {
+        snprintf(timestamp, sizeof(timestamp), "[00:00:00]");
+    }
 
     file.print(timestamp);
     file.print(" ");

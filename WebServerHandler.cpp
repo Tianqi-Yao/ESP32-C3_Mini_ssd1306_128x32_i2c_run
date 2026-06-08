@@ -10,6 +10,7 @@
 #include <SD.h>
 #include <WiFi.h>
 #include <WebServer.h>
+#include "esp_task_wdt.h"
 
 const char* ssid = "ESP32-AP";
 const char* password = "12345678";
@@ -19,6 +20,20 @@ bool exitRequested = false;
 // Path whitelist: only allow access to files under /logs/, and reject directory traversal.
 static bool isAllowedPath(const String& p) {
     return p.startsWith("/logs/") && p.indexOf("..") < 0;
+}
+
+// Stream a file to the client in chunks, feeding the watchdog between chunks so a large file
+// or a slow link cannot trip the task watchdog mid-transfer and reset the device.
+static void streamFileFed(File& file, const char* contentType) {
+    server.setContentLength(file.size());
+    server.send(200, contentType, "");
+    uint8_t buf[1024];
+    while (file.available()) {
+        size_t n = file.read(buf, sizeof(buf));
+        if (n == 0) break;
+        server.sendContent((const char*)buf, n);
+        esp_task_wdt_reset();
+    }
 }
 
 void handleFileDownload() {
@@ -39,7 +54,7 @@ void handleFileDownload() {
         return;
     }
 
-    server.streamFile(file, "application/octet-stream");
+    streamFileFed(file, "application/octet-stream");
     file.close();
 }
 
@@ -74,14 +89,16 @@ void handleListFiles() {
     JsonDocument doc;  // 7.x elastic document, grows as needed
     JsonArray root = doc.to<JsonArray>();
 
-    File rootDir = SD.open("/");
-    if (!rootDir) {
-        server.send(500, "text/plain", "Failed to open SD root directory");
-        LOG("WebServer: failed to open SD root directory");
+    // List only /logs (the only readable/downloadable location per isAllowedPath), so the tree
+    // does not show files outside the whitelist that would 403 when clicked.
+    File logsDir = SD.open("/logs");
+    if (!logsDir || !logsDir.isDirectory()) {
+        server.send(500, "text/plain", "Failed to open /logs directory");
+        LOG("WebServer: failed to open /logs directory");
         return;
     }
-    listFilesRecursively(rootDir, root);
-    rootDir.close();
+    listFilesRecursively(logsDir, root, "/logs");
+    logsDir.close();
 
     String result;
     serializeJson(doc, result);
@@ -108,8 +125,8 @@ void handleReadFile() {
         return;
     }
 
-    // Stream the response to avoid building the whole file into a String and exhausting memory.
-    server.streamFile(file, "text/plain");
+    // Stream the response (chunked, watchdog-fed) to avoid building the whole file into a String.
+    streamFileFed(file, "text/plain");
     file.close();
 }
 
@@ -220,15 +237,21 @@ void startWiFiAndWeb() {
     WiFi.softAP(ssid, password);
     WiFi.setTxPower(WIFI_POWER_8_5dBm);
 
-    server.on("/", handleRoot);
-    server.on("/exit", handleExit);
-    server.on("/power-on", handlePowerOn);
-    server.on("/power-off", handlePowerOff);
-    server.on("/rtc-sync-browser", HTTP_POST, handleRTCSyncFromBrowser);
-    server.on("/files", handleListFiles);
-    server.on("/file", handleReadFile);
-    server.on("/format-sd", handleFormatSDCard);
-    server.on("/download", handleFileDownload);
+    // Register routes only once: server.stop() does not clear the handler list, so registering
+    // on every WiFi-mode entry would leak a duplicate set of handlers each time.
+    static bool routesRegistered = false;
+    if (!routesRegistered) {
+        server.on("/", handleRoot);
+        server.on("/exit", handleExit);
+        server.on("/power-on", handlePowerOn);
+        server.on("/power-off", handlePowerOff);
+        server.on("/rtc-sync-browser", HTTP_POST, handleRTCSyncFromBrowser);
+        server.on("/files", handleListFiles);
+        server.on("/file", handleReadFile);
+        server.on("/format-sd", handleFormatSDCard);
+        server.on("/download", handleFileDownload);
+        routesRegistered = true;
+    }
     server.begin();
     exitRequested = false;
 
@@ -258,19 +281,5 @@ void blinkLED(int LED_PIN) {
         ledState = !ledState;
         digitalWrite(LED_PIN, ledState ? HIGH : LOW);
         lastToggle = millis();
-    }
-}
-
-void scanNetworks() {
-    LOG("Scanning WiFi...");
-    int n = WiFi.scanNetworks();
-    if (n == 0) {
-        LOG("No networks found.");
-    } else {
-        for (int i = 0; i < n; ++i) {
-            String line = WiFi.SSID(i) + " (" + String(WiFi.RSSI(i)) + "dBm)";
-            if (WiFi.encryptionType(i) == WIFI_AUTH_OPEN) line += " [open]";
-            LOG(line);
-        }
     }
 }

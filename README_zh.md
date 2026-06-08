@@ -137,11 +137,32 @@ arduino-cli monitor -p /dev/ttyACM0 -c baudrate=115200
 恢复供电后，负载下垂不会立刻又跌破断电线。断电期间外部负载已断开，所以读到的是静置电压
 （准确且稳定）。把 `RECOVERY_PERCENT` 调高更不易抖动，调低则恢复更快。
 
+## 可靠性
+
+设备需要长期无人值守运行，因此加了两道防护应对卡死和时钟失效：
+
+### 看门狗
+在 `setup()` 末尾启用任务看门狗（`esp_task_wdt`），超时 30 秒，并在每轮 `loop()` 最顶部喂狗。
+一旦 loop 卡死（SD/I2C/WiFi 锁死），看门狗会触发复位、设备自动重启，而不是一直僵死等人工断电。
+超时时间宽于最长的合法阻塞调用（`WiFi.scanNetworks()`，数秒）。初始化通过 `ESP_ARDUINO_VERSION_MAJOR`
+同时兼容 arduino-esp32 核心 2.x 和 3.x。
+
+### RTC 失效降级
+所有与时间相关的逻辑都依赖 DS3231 RTC，所以用 `isRtcValid()`（RTC 成功初始化且年份在 2024-2099）
+对 RTC 缺失/损坏做防御性处理：
+- RTC 无效时**暂停**定时开关机和每日标志清零，绝不在垃圾时间上切换电源；并记一条节流告警（最多每分钟一次）。
+- 日志文件名和时间戳兜底为 `unknown-date.csv` / `systemLog_unknown.txt` 和归零时间戳，
+  避免把乱码日期文件散落到卡上。
+- 基于 `millis()` 的采样、电压记录和低电保护**不受影响**，照常运行（它们不依赖 RTC）。
+- 开机时三个初始化（`rtcInit` / `sensorInit` / `storageInit`）失败会醒目地记录日志，不再静默。
+
 ## 数据格式
 
 - `/logs/<YYYY-MM-DD>.csv` —— 温湿度：`date,time,temp,humidity`
-- `/logs/voltage.csv` —— 电池：`date,time,voltage,percent`
+- `/logs/voltage_<YYYY-MM>.csv` —— 电池（按月滚动）：`date,time,voltage,percent`
 - `/logs/systemLog_<YYYY-MM-DD>.txt` —— 带时间戳的系统日志
+
+RTC 时间无效时，带日期的文件名会兜底为 `unknown-date.csv`、`voltage_unknown.csv`、`systemLog_unknown.txt`。
 
 ## 项目结构
 

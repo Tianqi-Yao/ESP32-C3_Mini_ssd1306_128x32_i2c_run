@@ -86,14 +86,13 @@ String sensorUI(float temp, float hum, float batteryVoltage, int batteryPercent,
                         .then(data => {
                             const logFiles = [];
 
-                            function collectLogs(tree, prefix = "") {
+                            // Use the server-provided item.path (already /logs/...) and recurse into dirs.
+                            function collectLogs(tree) {
                                 for (const item of tree) {
-                                    const fullPath = prefix + "/" + item.name;
-                                    if (item.type === "file" && fullPath.startsWith("/logs/")) {
-                                        logFiles.push(fullPath);
-                                    }
-                                    if (item.type === "dir") {
-                                        collectLogs(item.children, fullPath);
+                                    if (item.type === "file") {
+                                        logFiles.push(item.path);
+                                    } else if (item.type === "dir") {
+                                        collectLogs(item.children);
                                     }
                                 }
                             }
