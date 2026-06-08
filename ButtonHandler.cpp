@@ -9,7 +9,7 @@ static unsigned long pressStartTime = 0;
 static bool longPressHandled = false;
 
 const unsigned long DEBOUNCE_DELAY = 30;
-const unsigned long LONG_PRESS_DURATION = 3000; // 3 seconds
+const unsigned long LONG_PRESS_DURATION = 2000; // 2 seconds
 
 void buttonInit(int buttonPin)
 {

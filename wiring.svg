@@ -1,0 +1,257 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1300" font-family="Arial, Helvetica, sans-serif">
+  <!-- ESP32-C3 Mini battery monitor / data logger wiring diagram. Connections derived from firmware. -->
+  <rect x="0" y="0" width="1600" height="1300" fill="#ffffff"/>
+
+  <!-- ===== Title block ===== -->
+  <rect x="90" y="25" width="1420" height="66" fill="#f5f7fa" stroke="#90a4ae" stroke-width="1.5" rx="6"/>
+  <text x="110" y="55" font-size="24" font-weight="bold" fill="#102027">ESP32-C3 Mini — Battery Monitor / Data Logger</text>
+  <text x="110" y="80" font-size="15" fill="#455a64">Wiring diagram (connections per firmware) - 4S LiFePO4 - DS3231 - SHT35 - MicroSD - onboard LED/BOOT - 33k/10k divider</text>
+
+  <!-- ===== Power / Ground bus (frame) ===== -->
+  <text x="78" y="115" font-size="14" font-weight="bold" fill="#e53935" text-anchor="end">+3V3</text>
+  <text x="78" y="150" font-size="14" font-weight="bold" fill="#212121" text-anchor="end">GND</text>
+  <line x1="90" y1="110" x2="1510" y2="110" stroke="#e53935" stroke-width="4"/>
+  <line x1="90" y1="145" x2="1510" y2="145" stroke="#212121" stroke-width="4"/>
+  <!-- GND ring: right vertical + bottom rail -->
+  <line x1="1510" y1="145" x2="1510" y2="1010" stroke="#212121" stroke-width="4"/>
+  <line x1="1100" y1="1010" x2="1510" y2="1010" stroke="#212121" stroke-width="4"/>
+
+  <!-- ============================================================ -->
+  <!-- ESP32-C3 SuperMini board (center)                            -->
+  <!-- ============================================================ -->
+  <g>
+    <rect x="690" y="400" width="210" height="470" rx="10" fill="#1b1b22" stroke="#000" stroke-width="1.5"/>
+    <!-- USB-C (top, on the 5V side) -->
+    <rect x="770" y="378" width="50" height="22" rx="6" fill="#b0bec5" stroke="#607d8b"/>
+    <text x="795" y="372" font-size="9" fill="#90a4ae" text-anchor="middle">USB-C</text>
+    <!-- PCB antenna (bottom) -->
+    <path d="M745,892 h100 v-14 h-12 v8 h-12 v-8 h-12 v8 h-12 v-8 h-12 v8 h-12 v-8 h-12 v14 z" fill="#caa64a"/>
+    <text x="795" y="430" font-size="15" font-weight="bold" fill="#eceff1" text-anchor="middle">ESP32-C3</text>
+    <text x="795" y="448" font-size="11" fill="#90a4ae" text-anchor="middle">SuperMini</text>
+    <!-- onboard blue LED (GPIO8) and BOOT button (GPIO9) -->
+    <circle cx="820" cy="620" r="9" fill="#2979ff" stroke="#0d47a1" stroke-width="1.5"/>
+    <text x="803" y="624" font-size="9" fill="#90a4ae" text-anchor="end">LED</text>
+    <rect x="811" y="666" width="18" height="18" rx="3" fill="#455a64" stroke="#cfd8dc"/>
+    <text x="803" y="679" font-size="9" fill="#90a4ae" text-anchor="end">BOOT</text>
+
+    <!-- Left pin pads + labels -->
+    <g>
+      <rect x="678" y="450" width="14" height="10" fill="#d4af37"/><text x="700" y="459" font-size="12" fill="#eceff1">GPIO5</text>
+      <rect x="678" y="505" width="14" height="10" fill="#d4af37"/><text x="700" y="514" font-size="12" fill="#eceff1">GPIO6</text>
+      <rect x="678" y="560" width="14" height="10" fill="#d4af37"/><text x="700" y="569" font-size="12" fill="#eceff1">GPIO7</text>
+      <rect x="678" y="615" width="14" height="10" fill="#d4af37"/><text x="700" y="624" font-size="12" fill="#ffd54f" font-weight="bold">GPIO8</text>
+      <rect x="678" y="670" width="14" height="10" fill="#d4af37"/><text x="700" y="679" font-size="12" fill="#ffd54f" font-weight="bold">GPIO9</text>
+      <rect x="678" y="725" width="14" height="10" fill="#d4af37"/><text x="700" y="734" font-size="12" fill="#ffd54f" font-weight="bold">GPIO10</text>
+      <rect x="678" y="780" width="14" height="10" fill="#d4af37"/><text x="700" y="789" font-size="12" fill="#ffd54f" font-weight="bold">GPIO20</text>
+      <rect x="678" y="835" width="14" height="10" fill="#d4af37"/><text x="700" y="844" font-size="12" fill="#ffd54f" font-weight="bold">GPIO21</text>
+    </g>
+    <!-- Right pin pads + labels -->
+    <g>
+      <rect x="900" y="450" width="14" height="10" fill="#d4af37"/><text x="890" y="459" font-size="12" fill="#eceff1" text-anchor="end">5V</text>
+      <rect x="900" y="505" width="14" height="10" fill="#d4af37"/><text x="890" y="514" font-size="12" fill="#ffd54f" font-weight="bold" text-anchor="end">GND</text>
+      <rect x="900" y="560" width="14" height="10" fill="#d4af37"/><text x="890" y="569" font-size="12" fill="#ffd54f" font-weight="bold" text-anchor="end">3V3</text>
+      <rect x="900" y="615" width="14" height="10" fill="#d4af37"/><text x="890" y="624" font-size="12" fill="#ffd54f" font-weight="bold" text-anchor="end">GPIO4</text>
+      <rect x="900" y="670" width="14" height="10" fill="#d4af37"/><text x="890" y="679" font-size="12" fill="#ffd54f" font-weight="bold" text-anchor="end">GPIO3</text>
+      <rect x="900" y="725" width="14" height="10" fill="#d4af37"/><text x="890" y="734" font-size="12" fill="#ffd54f" font-weight="bold" text-anchor="end">GPIO2</text>
+      <rect x="900" y="780" width="14" height="10" fill="#d4af37"/><text x="890" y="789" font-size="12" fill="#ffd54f" font-weight="bold" text-anchor="end">GPIO1</text>
+      <rect x="900" y="835" width="14" height="10" fill="#d4af37"/><text x="890" y="844" font-size="12" fill="#ffd54f" font-weight="bold" text-anchor="end">GPIO0</text>
+    </g>
+  </g>
+
+  <!-- ============================================================ -->
+  <!-- DS3231 RTC module (top-left)                                 -->
+  <!-- ============================================================ -->
+  <g>
+    <rect x="110" y="230" width="300" height="130" rx="6" fill="#2b5b84" stroke="#173550" stroke-width="1.5"/>
+    <text x="130" y="258" font-size="16" font-weight="bold" fill="#fff">DS3231 RTC</text>
+    <circle cx="190" cy="312" r="30" fill="#cfd8dc" stroke="#90a4ae" stroke-width="2"/>
+    <text x="190" y="316" font-size="10" fill="#546e7a" text-anchor="middle">CR2032</text>
+    <!-- right-edge header -->
+    <rect x="404" y="244" width="12" height="9" fill="#d4af37"/><text x="398" y="252" font-size="10" fill="#fff" text-anchor="end">32K</text>
+    <rect x="404" y="264" width="12" height="9" fill="#d4af37"/><text x="398" y="272" font-size="10" fill="#fff" text-anchor="end">SQW</text>
+    <rect x="404" y="284" width="12" height="9" fill="#d4af37"/><text x="398" y="292" font-size="10" fill="#fff" text-anchor="end">SCL</text>
+    <rect x="404" y="304" width="12" height="9" fill="#d4af37"/><text x="398" y="312" font-size="10" fill="#fff" text-anchor="end">SDA</text>
+    <rect x="404" y="324" width="12" height="9" fill="#d4af37"/><text x="398" y="332" font-size="10" fill="#fff" text-anchor="end">VCC</text>
+    <rect x="404" y="344" width="12" height="9" fill="#d4af37"/><text x="398" y="352" font-size="10" fill="#fff" text-anchor="end">GND</text>
+  </g>
+
+  <!-- ============================================================ -->
+  <!-- SHT35 temp/humidity module (mid-left)                        -->
+  <!-- ============================================================ -->
+  <g>
+    <rect x="110" y="430" width="260" height="120" rx="6" fill="#37474f" stroke="#1c272c" stroke-width="1.5"/>
+    <text x="130" y="458" font-size="16" font-weight="bold" fill="#fff">SHT35</text>
+    <text x="130" y="478" font-size="11" fill="#b0bec5">Temp / Humidity (I2C 0x44)</text>
+    <rect x="240" y="500" width="40" height="30" rx="3" fill="#cfd8dc"/>
+    <!-- right-edge header -->
+    <rect x="364" y="450" width="12" height="9" fill="#d4af37"/><text x="358" y="458" font-size="10" fill="#fff" text-anchor="end">VCC</text>
+    <rect x="364" y="475" width="12" height="9" fill="#d4af37"/><text x="358" y="483" font-size="10" fill="#fff" text-anchor="end">GND</text>
+    <rect x="364" y="500" width="12" height="9" fill="#d4af37"/><text x="358" y="508" font-size="10" fill="#fff" text-anchor="end">SCL</text>
+    <rect x="364" y="525" width="12" height="9" fill="#d4af37"/><text x="358" y="533" font-size="10" fill="#fff" text-anchor="end">SDA</text>
+  </g>
+
+  <!-- ============================================================ -->
+  <!-- Relay / Power latch (left)                                   -->
+  <!-- ============================================================ -->
+  <g>
+    <rect x="110" y="640" width="300" height="150" rx="6" fill="#1565c0" stroke="#0d3c75" stroke-width="1.5"/>
+    <text x="130" y="668" font-size="15" font-weight="bold" fill="#fff">Power Latch / Relay</text>
+    <rect x="135" y="685" width="70" height="70" rx="4" fill="#1e88e5" stroke="#fff" stroke-width="1"/>
+    <text x="170" y="725" font-size="11" fill="#fff" text-anchor="middle">RELAY</text>
+    <!-- screw terminal (load side) -->
+    <rect x="225" y="690" width="120" height="60" rx="4" fill="#2e7d32" stroke="#1b5e20"/>
+    <text x="285" y="715" font-size="10" fill="#fff" text-anchor="middle">COM &lt;- Batt+</text>
+    <text x="285" y="735" font-size="10" fill="#fff" text-anchor="middle">NO -&gt; Load+</text>
+    <!-- control header (right edge): 2-wire only, signal + GND (no VCC) -->
+    <rect x="404" y="674" width="12" height="9" fill="#d4af37"/><text x="398" y="682" font-size="10" fill="#fff" text-anchor="end">IN</text>
+    <rect x="404" y="714" width="12" height="9" fill="#d4af37"/><text x="398" y="722" font-size="10" fill="#fff" text-anchor="end">GND</text>
+  </g>
+
+  <!-- Note: GPIO8 (blue LED) and GPIO9 (BOOT button) are onboard the ESP32-C3 SuperMini; no external wiring. -->
+
+  <!-- ============================================================ -->
+  <!-- MicroSD module (top-right)                                   -->
+  <!-- ============================================================ -->
+  <g>
+    <rect x="1120" y="250" width="300" height="185" rx="6" fill="#1a3a6b" stroke="#0d2147" stroke-width="1.5"/>
+    <text x="1410" y="278" font-size="16" font-weight="bold" fill="#fff" text-anchor="end">MicroSD</text>
+    <rect x="1230" y="300" width="180" height="120" rx="4" fill="#b0bec5" stroke="#78909c" stroke-width="2"/>
+    <text x="1320" y="365" font-size="11" fill="#455a64" text-anchor="middle">CARD SLOT (SPI)</text>
+    <!-- left-edge header: 3V3 / CS / MOSI / CLK / MISO / GND -->
+    <rect x="1118" y="270" width="12" height="9" fill="#d4af37"/><text x="1138" y="278" font-size="10" fill="#fff">3V3</text>
+    <rect x="1118" y="295" width="12" height="9" fill="#d4af37"/><text x="1138" y="303" font-size="10" fill="#fff">CS</text>
+    <rect x="1118" y="320" width="12" height="9" fill="#d4af37"/><text x="1138" y="328" font-size="10" fill="#fff">MOSI</text>
+    <rect x="1118" y="345" width="12" height="9" fill="#d4af37"/><text x="1138" y="353" font-size="10" fill="#fff">CLK</text>
+    <rect x="1118" y="370" width="12" height="9" fill="#d4af37"/><text x="1138" y="378" font-size="10" fill="#fff">MISO</text>
+    <rect x="1118" y="395" width="12" height="9" fill="#d4af37"/><text x="1138" y="403" font-size="10" fill="#fff">GND</text>
+  </g>
+
+  <!-- ============================================================ -->
+  <!-- Battery + voltage divider (bottom-right)                     -->
+  <!-- ============================================================ -->
+  <g>
+    <!-- battery -->
+    <rect x="1290" y="600" width="180" height="150" rx="8" fill="#2e3b2f" stroke="#1b261c" stroke-width="1.5"/>
+    <text x="1380" y="668" font-size="15" font-weight="bold" fill="#a5d6a7" text-anchor="middle">4S LiFePO4</text>
+    <text x="1380" y="690" font-size="12" fill="#c8e6c9" text-anchor="middle">~12.8V (14.6V full)</text>
+    <text x="1300" y="625" font-size="14" font-weight="bold" fill="#ff8a80">+</text>
+    <text x="1300" y="745" font-size="14" font-weight="bold" fill="#eceff1">-</text>
+    <rect x="1284" y="624" width="12" height="9" fill="#d4af37"/>
+    <rect x="1284" y="734" width="12" height="9" fill="#d4af37"/>
+
+    <!-- divider resistors -->
+    <rect x="1175" y="630" width="50" height="22" rx="3" fill="#d2b48c" stroke="#8d6e63"/>
+    <rect x="1185" y="630" width="4" height="22" fill="#e65100"/><rect x="1195" y="630" width="4" height="22" fill="#e65100"/><rect x="1205" y="630" width="4" height="22" fill="#fb8c00"/>
+    <text x="1135" y="646" font-size="13" font-weight="bold" fill="#37474f" text-anchor="end">R1 33k</text>
+
+    <rect x="1175" y="760" width="50" height="22" rx="3" fill="#d2b48c" stroke="#8d6e63"/>
+    <rect x="1185" y="760" width="4" height="22" fill="#5d4037"/><rect x="1195" y="760" width="4" height="22" fill="#000"/><rect x="1205" y="760" width="4" height="22" fill="#e65100"/>
+    <text x="1135" y="776" font-size="13" font-weight="bold" fill="#37474f" text-anchor="end">R2 10k</text>
+
+    <text x="1110" y="722" font-size="11" fill="#6d4c41" text-anchor="end">tap -&gt; GPIO0</text>
+    <circle cx="1200" cy="716" r="4" fill="#6d4c41"/>
+  </g>
+
+  <!-- ============================================================ -->
+  <!-- WIRES                                                        -->
+  <!-- ============================================================ -->
+
+  <!-- ESP power taps to buses -->
+  <path d="M914,565 H960 V110" fill="none" stroke="#e53935" stroke-width="4"/><circle cx="960" cy="110" r="4" fill="#e53935"/>
+  <path d="M914,510 H985 V145" fill="none" stroke="#212121" stroke-width="4"/><circle cx="985" cy="145" r="4" fill="#212121"/>
+
+  <!-- I2C: SCL (amber) GPIO20 shared by DS3231 + SHT35 -->
+  <path d="M678,785 H620 V288 H404" fill="none" stroke="#f9a825" stroke-width="4"/>
+  <path d="M364,505 H620" fill="none" stroke="#f9a825" stroke-width="4"/>
+  <circle cx="620" cy="505" r="4" fill="#f9a825"/>
+  <!-- I2C: SDA (green) GPIO21 shared -->
+  <path d="M678,840 H650 V308 H404" fill="none" stroke="#43a047" stroke-width="4"/>
+  <path d="M364,530 H650" fill="none" stroke="#43a047" stroke-width="4"/>
+  <circle cx="650" cy="530" r="4" fill="#43a047"/>
+
+  <!-- DS3231 power -->
+  <path d="M404,324 H430 V110" fill="none" stroke="#e53935" stroke-width="4"/><circle cx="430" cy="110" r="4" fill="#e53935"/>
+  <path d="M404,344 H450 V145" fill="none" stroke="#212121" stroke-width="4"/><circle cx="450" cy="145" r="4" fill="#212121"/>
+  <!-- SHT35 power -->
+  <path d="M364,450 H400 V110" fill="none" stroke="#e53935" stroke-width="4"/><circle cx="400" cy="110" r="4" fill="#e53935"/>
+  <path d="M364,475 H470 V145" fill="none" stroke="#212121" stroke-width="4"/><circle cx="470" cy="145" r="4" fill="#212121"/>
+
+  <!-- Power latch: signal + GND only (no VCC) -->
+  <path d="M404,674 H560 V730 H678" fill="none" stroke="#00acc1" stroke-width="4"/>
+  <path d="M404,714 H510 V145" fill="none" stroke="#212121" stroke-width="4"/><circle cx="510" cy="145" r="4" fill="#212121"/>
+
+  <!-- SD SPI: nested even lanes (CS purple, MOSI orange, CLK blue, MISO teal) -->
+  <path d="M1118,295 H965 V615 H914" fill="none" stroke="#8e24aa" stroke-width="4"/>
+  <path d="M1118,320 H1000 V670 H914" fill="none" stroke="#fb8c00" stroke-width="4"/>
+  <path d="M1118,345 H1035 V725 H914" fill="none" stroke="#1e88e5" stroke-width="4"/>
+  <path d="M1118,370 H1070 V780 H914" fill="none" stroke="#00897b" stroke-width="4"/>
+  <!-- SD power: 3V3 (top pin) up to bus, GND (bottom pin) straight down to bottom GND bus -->
+  <path d="M1118,270 H1100 V110" fill="none" stroke="#e53935" stroke-width="4"/><circle cx="1100" cy="110" r="4" fill="#e53935"/>
+  <path d="M1118,395 V1010" fill="none" stroke="#212121" stroke-width="4"/><circle cx="1118" cy="1010" r="4" fill="#212121"/>
+
+  <!-- ADC divider tap -> GPIO0 (brown) -->
+  <path d="M1200,716 H1090 V840 H914" fill="none" stroke="#6d4c41" stroke-width="4"/>
+
+  <!-- Divider internal + battery -->
+  <path d="M1296,628 H1200 V630" fill="none" stroke="#b71c1c" stroke-width="4"/>
+  <path d="M1200,652 V760" fill="none" stroke="#b71c1c" stroke-width="4"/>
+  <path d="M1200,782 V1010" fill="none" stroke="#212121" stroke-width="4"/>
+  <path d="M1296,738 V1010" fill="none" stroke="#212121" stroke-width="4"/><circle cx="1296" cy="1010" r="4" fill="#212121"/>
+
+  <!-- GPIO8 LED and GPIO9 BOOT button are onboard: no external wires. -->
+
+  <!-- ============================================================ -->
+  <!-- Legend (bottom-left)                                         -->
+  <!-- ============================================================ -->
+  <g>
+    <rect x="90" y="1055" width="340" height="210" rx="6" fill="#f5f7fa" stroke="#90a4ae" stroke-width="1.5"/>
+    <text x="105" y="1080" font-size="14" font-weight="bold" fill="#102027">Wire legend</text>
+    <line x1="105" y1="1098" x2="135" y2="1098" stroke="#e53935" stroke-width="4"/><text x="143" y="1102" font-size="12" fill="#37474f">3V3 power</text>
+    <line x1="105" y1="1118" x2="135" y2="1118" stroke="#212121" stroke-width="4"/><text x="143" y="1122" font-size="12" fill="#37474f">GND</text>
+    <line x1="105" y1="1138" x2="135" y2="1138" stroke="#43a047" stroke-width="4"/><text x="143" y="1142" font-size="12" fill="#37474f">I2C SDA</text>
+    <line x1="105" y1="1158" x2="135" y2="1158" stroke="#f9a825" stroke-width="4"/><text x="143" y="1162" font-size="12" fill="#37474f">I2C SCL</text>
+    <line x1="105" y1="1178" x2="135" y2="1178" stroke="#6d4c41" stroke-width="4"/><text x="143" y="1182" font-size="12" fill="#37474f">ADC (battery sense)</text>
+    <line x1="105" y1="1198" x2="135" y2="1198" stroke="#00acc1" stroke-width="4"/><text x="143" y="1202" font-size="12" fill="#37474f">Power latch control</text>
+    <line x1="105" y1="1218" x2="135" y2="1218" stroke="#b71c1c" stroke-width="4"/><text x="143" y="1222" font-size="12" fill="#37474f">Battery + (12V)</text>
+
+    <line x1="270" y1="1098" x2="300" y2="1098" stroke="#8e24aa" stroke-width="4"/><text x="308" y="1102" font-size="12" fill="#37474f">SPI CS</text>
+    <line x1="270" y1="1118" x2="300" y2="1118" stroke="#1e88e5" stroke-width="4"/><text x="308" y="1122" font-size="12" fill="#37474f">SPI SCK</text>
+    <line x1="270" y1="1138" x2="300" y2="1138" stroke="#fb8c00" stroke-width="4"/><text x="308" y="1142" font-size="12" fill="#37474f">SPI MOSI</text>
+    <line x1="270" y1="1158" x2="300" y2="1158" stroke="#00897b" stroke-width="4"/><text x="308" y="1162" font-size="12" fill="#37474f">SPI MISO</text>
+    <text x="270" y="1182" font-size="11" fill="#546e7a">GPIO8 LED and GPIO9</text>
+    <text x="270" y="1198" font-size="11" fill="#546e7a">BOOT button: onboard</text>
+  </g>
+
+  <!-- ============================================================ -->
+  <!-- Connection table (bottom)                                    -->
+  <!-- ============================================================ -->
+  <g font-size="12" fill="#263238">
+    <rect x="450" y="1055" width="1060" height="210" rx="6" fill="#ffffff" stroke="#90a4ae" stroke-width="1.5"/>
+    <rect x="450" y="1055" width="1060" height="26" rx="6" fill="#102027"/>
+    <text x="470" y="1073" font-size="13" font-weight="bold" fill="#fff">ESP32-C3 pin</text>
+    <text x="600" y="1073" font-size="13" font-weight="bold" fill="#fff">Signal</text>
+    <text x="760" y="1073" font-size="13" font-weight="bold" fill="#fff">Connects to</text>
+    <text x="1185" y="1073" font-size="13" font-weight="bold" fill="#fff">Note</text>
+
+    <line x1="450" y1="1107" x2="1510" y2="1107" stroke="#eceff1"/>
+    <line x1="450" y1="1135" x2="1510" y2="1135" stroke="#eceff1"/>
+    <line x1="450" y1="1163" x2="1510" y2="1163" stroke="#eceff1"/>
+    <line x1="450" y1="1191" x2="1510" y2="1191" stroke="#eceff1"/>
+    <line x1="450" y1="1219" x2="1510" y2="1219" stroke="#eceff1"/>
+    <line x1="450" y1="1247" x2="1510" y2="1247" stroke="#eceff1"/>
+
+    <text x="470" y="1100">GPIO21</text><text x="600" y="1100">I2C SDA</text><text x="760" y="1100">DS3231 SDA + SHT35 SDA</text><text x="1185" y="1100">shared bus</text>
+    <text x="470" y="1114">GPIO20</text><text x="600" y="1114">I2C SCL</text><text x="760" y="1114">DS3231 SCL + SHT35 SCL</text><text x="1185" y="1114">shared bus</text>
+    <text x="470" y="1128">GPIO4</text><text x="600" y="1128">SPI CS</text><text x="760" y="1128">MicroSD CS</text><text x="1185" y="1128">FSPI</text>
+    <text x="470" y="1142">GPIO3</text><text x="600" y="1142">SPI MOSI</text><text x="760" y="1142">MicroSD MOSI</text>
+    <text x="470" y="1156">GPIO2</text><text x="600" y="1156">SPI SCK</text><text x="760" y="1156">MicroSD CLK</text>
+    <text x="470" y="1170">GPIO1</text><text x="600" y="1170">SPI MISO</text><text x="760" y="1170">MicroSD MISO</text>
+    <text x="470" y="1184">GPIO0</text><text x="600" y="1184">ADC1_CH0</text><text x="760" y="1184">Battery divider tap (R1 33k / R2 10k)</text><text x="1185" y="1184">ratio 4.3</text>
+    <text x="470" y="1198">GPIO10</text><text x="600" y="1198">Power latch</text><text x="760" y="1198">Relay IN (signal only)</text><text x="1185" y="1198">2-wire, no VCC</text>
+    <text x="470" y="1212">GPIO9</text><text x="600" y="1212">BOOT button</text><text x="760" y="1212">onboard (to GND)</text><text x="1185" y="1212">INPUT_PULLUP</text>
+    <text x="470" y="1226">GPIO8</text><text x="600" y="1226">Blue LED</text><text x="760" y="1226">onboard</text><text x="1185" y="1226">blinks in WiFi mode</text>
+    <text x="470" y="1240">3V3</text><text x="600" y="1240">Power out</text><text x="760" y="1240">DS3231, SHT35, MicroSD</text><text x="1185" y="1240">relay has no VCC</text>
+    <text x="470" y="1254">GND</text><text x="600" y="1254">Ground</text><text x="760" y="1254">all modules + battery minus</text><text x="1185" y="1254">common ground</text>
+  </g>
+</svg>

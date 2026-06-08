@@ -31,20 +31,28 @@ maintained as a long-running, reliability-focused build.
 | Battery          | 4S LiFePO4 ("12V" pack, 12.8V nominal, 14.6V full)  |
 | Power control    | Latch/relay on `POWER_LATCH_PIN`                    |
 
-### Pin assignments
+### Wiring diagram
 
-| Function          | GPIO |
-|-------------------|------|
-| I2C SDA           | 21   |
-| I2C SCL           | 20   |
-| Button            | 9    |
-| LED               | 8    |
-| Power latch       | 10   |
-| Battery ADC       | 0 (ADC1_CH0) |
-| SD CS             | 4    |
-| SD MISO           | 1    |
-| SD MOSI           | 3    |
-| SD SCK            | 2    |
+![Wiring diagram](wiring.svg)
+
+### Pin mapping
+
+| ESP32-C3 pin | Signal / function   | Dir    | Connects to                       | Note                                   |
+|--------------|---------------------|--------|-----------------------------------|----------------------------------------|
+| **GPIO21**   | I2C SDA             | in/out | DS3231 SDA, SHT35 SDA             | shared I2C bus                         |
+| **GPIO20**   | I2C SCL             | out    | DS3231 SCL, SHT35 SCL             | shared I2C bus                         |
+| **GPIO10**   | Power latch control | out    | Relay/latch module signal (IN)    | 2-wire (signal + GND, no VCC); switches 12V load |
+| **GPIO9**    | BOOT button         | in     | onboard (to GND)                  | `INPUT_PULLUP`; long-press = WiFi mode |
+| **GPIO8**    | Blue LED            | out    | onboard                           | blinks in WiFi mode                    |
+| **GPIO4**    | SPI CS              | out    | MicroSD CS                        | FSPI                                   |
+| **GPIO3**    | SPI MOSI            | out    | MicroSD MOSI                      |                                        |
+| **GPIO2**    | SPI SCK             | out    | MicroSD CLK                       |                                        |
+| **GPIO1**    | SPI MISO            | in     | MicroSD MISO                      |                                        |
+| **GPIO0**    | ADC1_CH0            | in     | Divider tap (R1 33k / R2 10k)     | battery sense                          |
+| **3V3**      | Power               | out    | DS3231, SHT35, MicroSD            | relay/latch has no VCC                 |
+| **GND**      | Ground              | —      | all modules + battery minus       | common ground required                 |
+
+> GPIO8 (blue LED) and GPIO9 (BOOT button) are **onboard** the ESP32-C3 SuperMini, not external parts.
 
 ### Battery voltage divider
 
@@ -64,6 +72,16 @@ ESP32 GND ------------------------------------------ Battery -   (common ground 
 - **Headroom note:** at full charge (14.6V) the divider tap is ~3.40V, slightly above the 3.3V ADC
   limit, so readings near 100% are compressed. This is acceptable for this build; if precise
   high-end readings or extra pin headroom are needed, increase the ratio (e.g. 33k/6.8k ~= 5.85).
+
+> **Measured behavior / known limitation:** with the 33k/10k divider the tap exceeds the ESP32-C3
+> ADC's usable ceiling (~2.9V) whenever the battery is above ~12.6V, so the ADC **saturates** and the
+> reported voltage is pegged at ~13.42V / ~99% across the entire upper range (a healthy battery always
+> reads ~99% on the web panel). This is a hardware limit, **not a firmware bug** — software cannot
+> recover a saturated ADC. The ADC returns to its usable range below ~12.6V, so the **low-battery
+> cutoff, charge recovery, and reboot all work correctly** (they act in the low-voltage region). Because
+> the firmware ratio (4.61) reads ~6.5% high in the low range, the cutoff fires a little deeper than its
+> 12.5V label (around ~11.7-12V true) — still safe and backed by the pack's BMS. To make the full-range
+> reading trustworthy, lower the divider (e.g. R2 10k -> 6.8k, ratio ~5.85) so the tap stays in range.
 
 ## Build & flash (arduino-cli)
 
@@ -106,7 +124,7 @@ On boot the device initializes all modules, logs an initial voltage reading, the
 - applies the scheduled power on/off.
 
 ### WiFi mode
-Long-press the button (3s) to start a WiFi access point and web server:
+Long-press the button (2s) to start a WiFi access point and web server:
 - SSID: `ESP32-AP`, password: `12345678`, URL: `http://192.168.4.1`
 - The LED blinks while WiFi mode is active.
 - Use the "Exit WiFi mode" button on the page to return to normal operation.
