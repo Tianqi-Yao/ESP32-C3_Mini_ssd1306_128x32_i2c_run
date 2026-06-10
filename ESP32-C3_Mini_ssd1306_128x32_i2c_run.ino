@@ -22,8 +22,8 @@
 #define VOLTAGE_INTERVAL_MS     10 * 60000UL        // Log battery voltage every 10 min
 #define RECOVERY_CHECK_INTERVAL 1 * 60000UL         // Check resting-voltage recovery every 1 min
 
-#define POWER_ON_HOUR           6
-#define POWER_OFF_HOUR          20
+#define POWER_ON_HOUR           5
+#define POWER_OFF_HOUR          21
 // Cutoff/recovery use hysteresis: the recovery threshold must be clearly higher than the
 // cutoff threshold, so that after power is restored the load sag will not immediately drop
 // back below the cutoff line -> prevents on/off oscillation.
