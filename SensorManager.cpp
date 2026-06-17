@@ -27,7 +27,12 @@ bool sensorInit()
 bool refreshSensorData()
 {
     if (!sensorReady) {
-        LOG("Sensor not ready. Skipping read.");
+        static unsigned long lastWarn = 0;
+        unsigned long warnNow = millis();
+        if (lastWarn == 0 || warnNow - lastWarn >= 3600000UL) {
+            lastWarn = (warnNow == 0) ? 1UL : warnNow;
+            LOG("Sensor not ready. Skipping read.");
+        }
         return false;
     }
 
@@ -35,14 +40,21 @@ bool refreshSensorData()
     float h = sht31.readHumidity();
 
     if (isnan(t) || isnan(h)) {
-        LOG("Failed to read SHT35 data (NaN).");
+        static unsigned long lastNanWarn = 0;
+        unsigned long warnNow = millis();
+        if (lastNanWarn == 0 || warnNow - lastNanWarn >= 3600000UL) {
+            lastNanWarn = (warnNow == 0) ? 1UL : warnNow;
+            LOG("Failed to read SHT35 data (NaN).");
+        }
         return false;
     }
 
     currentTemp = t;
     currentHum = h;
 
+#if STORAGE_DEBUG
     LOG("sensor: Temp: " + String(t, 2) + " C, Hum: " + String(h, 2) + " %");
+#endif
     return true;
 }
 

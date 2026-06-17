@@ -2,6 +2,7 @@
 #include "RTC.h"
 #include <SPI.h>
 #include <SD.h>
+#include "esp_task_wdt.h"
 
 #define SD_CS         4
 #define LOG_DIR       "/logs"
@@ -29,6 +30,42 @@ bool storageInit()
 #if STORAGE_DEBUG
     LOG("SD card ready.");
 #endif
+    return true;
+}
+
+bool storageReinit()
+{
+    esp_task_wdt_reset();   // SD.end() may take time; feed watchdog before blocking ops
+    SD.end();
+    spi.begin(SCK_PIN, MISO_PIN, MOSI_PIN, SD_CS);
+    esp_task_wdt_reset();   // SD.begin() may take several seconds; feed again
+    if (!SD.begin(SD_CS, spi)) {
+        storageReady = false;
+        Serial.println("SD remount failed.");
+        return false;
+    }
+    SD.mkdir(LOG_DIR);
+    storageReady = true;
+    Serial.println("SD card remounted successfully.");
+    return true;
+}
+
+bool isStorageReady()
+{
+    return storageReady;
+}
+
+bool storageHealthCheck()
+{
+    esp_task_wdt_reset();   // SD.open() on a missing card may stall; feed watchdog first
+    File dir = SD.open("/logs");
+    bool ok = dir && dir.isDirectory();
+    if (dir) dir.close();
+    if (!ok) {
+        Serial.println("SD health check failed, attempting remount...");
+        return storageReinit();
+    }
+    storageReady = true;
     return true;
 }
 
@@ -67,21 +104,20 @@ bool saveTemperatureHumidityWithTime(float temp, float hum)
         snprintf(line, sizeof(line), "0000-00-00,00:00:00,%.2f,%.2f", temp, hum);
     }
 
-    File file = SD.open(getTodayLogPath().c_str(), FILE_APPEND);
+    String logPath = getTodayLogPath();
+    File file = SD.open(logPath.c_str(), FILE_APPEND);
     if (!file) {
-#if STORAGE_DEBUG
-        LOG("Failed to open log file.");
-#endif
-        return false;
+        Serial.println("SD open failed, attempting remount...");
+        if (!storageReinit()) return false;
+        file = SD.open(logPath.c_str(), FILE_APPEND);
+        if (!file) {
+            Serial.println("Failed to open log file after remount.");
+            return false;
+        }
     }
 
     file.println(line);
     file.close();
-
-#if STORAGE_DEBUG
-    LOG("Data saved: " + String(line));
-#endif
-
     return true;
 }
 
@@ -93,7 +129,8 @@ bool logMessage(const String& message)
     }
 
     bool rtcOk = isRtcValid();
-    DateTime now = getCurrentDateTime();
+    DateTime now;
+    if (rtcOk) now = getCurrentDateTime();
 
     // Name the log file by date, falling back to a fixed name when the RTC time is invalid.
     char filename[40];
@@ -106,8 +143,13 @@ bool logMessage(const String& message)
 
     File file = SD.open(filename, FILE_APPEND);
     if (!file) {
-        Serial.println("Failed to open system log file.");
-        return false;
+        Serial.println("SD open failed, attempting remount...");
+        if (!storageReinit()) return false;
+        file = SD.open(filename, FILE_APPEND);
+        if (!file) {
+            Serial.println("Failed to open system log file after remount.");
+            return false;
+        }
     }
 
     // Write a timestamped log line (zeros when the RTC time is invalid)

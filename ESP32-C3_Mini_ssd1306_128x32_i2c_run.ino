@@ -43,6 +43,10 @@ int lastResetDay = -1;   // Day-of-month at last flag reset, used for day-rollov
 
 // ========== Voltage log ==========
 bool logVoltageStatus(float voltage, int percent) {
+    if (!isStorageReady()) {
+        Serial.println("Skip voltage log: SD not ready.");
+        return false;
+    }
     // Rotate the voltage log monthly so the file stays bounded (~4300 lines/month) instead of
     // growing without limit (it used to be a single file appended every 10 min forever).
     String path;
@@ -56,8 +60,12 @@ bool logVoltageStatus(float voltage, int percent) {
     }
     File file = SD.open(path, FILE_APPEND);
     if (!file) {
-        LOG("Failed to open voltage log file");
-        return false;
+        Serial.println("Voltage log SD open failed, attempting remount...");
+        if (storageReinit()) file = SD.open(path, FILE_APPEND);
+        if (!file) {
+            Serial.println("Voltage log failed after remount");
+            return false;
+        }
     }
 
     char line[64];
@@ -72,7 +80,9 @@ bool logVoltageStatus(float voltage, int percent) {
     }
     file.println(line);
     file.close();
+#if STORAGE_DEBUG
     LOG("Voltage logged: " + String(line));
+#endif
     return true;
 }
 
@@ -111,6 +121,7 @@ void setup() {
     int percent = getBatteryPercentage(voltage);
     logVoltageStatus(voltage, percent);
     LOG("Initial voltage logged at boot: " + String(voltage, 2) + "V (" + String(percent) + "%)");
+    lastVoltLog = millis();   // prevent loop() from logging again immediately on first iteration
 
     // Enable the task watchdog last, after the blocking init sequence above.
     // If the loop ever hangs (SD/I2C/WiFi lockup) the device auto-resets instead of freezing.
@@ -136,8 +147,12 @@ void loop() {
 
     unsigned long now = millis();
     bool rtcOk = isRtcValid();
-    DateTime rtcNow = getCurrentDateTime();
-    int hour = rtcNow.hour();
+    DateTime rtcNow;
+    int hour = 0;
+    if (rtcOk) {
+        rtcNow = getCurrentDateTime();
+        hour = rtcNow.hour();
+    }
 
     // Time-dependent logic only runs when the RTC time is valid, so a dead/missing RTC
     // never toggles power on garbage time. millis()-based sampling below is unaffected.
@@ -153,14 +168,21 @@ void loop() {
         // Throttled warning so an invalid RTC does not flood the log every loop
         static unsigned long lastRtcWarn = 0;
         if (lastRtcWarn == 0 || now - lastRtcWarn >= 60000UL) {
-            lastRtcWarn = now;
+            lastRtcWarn = (now == 0) ? 1UL : now;
             LOG("WARNING: RTC invalid; scheduling/day-rollover paused, using fallback timestamps");
         }
     }
 
+    // 0) Periodic SD health check: detect card swap and remount automatically
+    static unsigned long lastSdCheck = 0;
+    if (now - lastSdCheck >= 30000UL || lastSdCheck == 0) {
+        lastSdCheck = (now == 0) ? 1UL : now;
+        storageHealthCheck();
+    }
+
     // 1) Sample temperature/humidity every minute
     if (now - lastTempLog >= TEMP_INTERVAL_MS || lastTempLog == 0) {
-        lastTempLog = now;
+        lastTempLog = (now == 0) ? 1UL : now;
         if (refreshSensorData()) {
             float temp = getTemperature();
             float hum = getHumidity();
@@ -170,7 +192,7 @@ void loop() {
 
     // 2) Log battery voltage every 10 minutes
     if (now - lastVoltLog >= VOLTAGE_INTERVAL_MS || lastVoltLog == 0) {
-        lastVoltLog = now;
+        lastVoltLog = (now == 0) ? 1UL : now;
         float voltage = readBatteryVoltage();
         int percent = getBatteryPercentage(voltage);
         logVoltageStatus(voltage, percent);
@@ -198,6 +220,7 @@ void loop() {
             LOG("Battery recovered to " + String(currentPercent) + "%, restoring power and resuming sampling");
             powerOn();
             lowPowerShutdown = false;
+            powerOnTriggeredToday = true;   // prevent scheduled power-on from firing again same day
         }
     }
 

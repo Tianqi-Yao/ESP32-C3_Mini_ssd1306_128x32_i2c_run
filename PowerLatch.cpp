@@ -6,6 +6,10 @@ static int POWER_LATCH_PIN = -1; // power relay control pin
 
 void initPowerLatch(int powerLatchPin)
 {
+    if (powerLatchPin < 0) {
+        Serial.println("PowerLatch: invalid pin, latch disabled.");
+        return;
+    }
     POWER_LATCH_PIN = powerLatchPin;
     pinMode(POWER_LATCH_PIN, OUTPUT);
     digitalWrite(POWER_LATCH_PIN, HIGH); // default to powered ON (HIGH)
@@ -15,6 +19,7 @@ void initPowerLatch(int powerLatchPin)
 
 void powerOn()
 {
+    if (POWER_LATCH_PIN < 0) return;
     if (digitalRead(POWER_LATCH_PIN) == LOW) {
         digitalWrite(POWER_LATCH_PIN, HIGH); // power on
         delay(500); // let the supply stabilize
@@ -26,6 +31,7 @@ void powerOn()
 
 void powerOff()
 {
+    if (POWER_LATCH_PIN < 0) return;
     if (digitalRead(POWER_LATCH_PIN) == HIGH) {
         digitalWrite(POWER_LATCH_PIN, LOW); // power off
         delay(500); // let the supply settle

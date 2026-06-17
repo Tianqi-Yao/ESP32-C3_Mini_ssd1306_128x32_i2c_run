@@ -3,6 +3,9 @@
 #include <Arduino.h>
 
 bool storageInit();
+bool storageReinit();
+bool isStorageReady();
+bool storageHealthCheck();
 bool saveTemperatureHumidityWithTime(float temp, float hum);
 String getTodayLogPath();
 bool logMessage(const String& message);

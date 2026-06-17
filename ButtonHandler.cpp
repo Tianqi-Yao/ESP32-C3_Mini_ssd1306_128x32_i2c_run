@@ -20,6 +20,7 @@ void buttonInit(int buttonPin)
 
 ButtonEvent checkButtonEvent()
 {
+    if (btnPin < 0) return NONE;
     bool reading = digitalRead(btnPin);
 
     if (reading != lastReading) {
@@ -30,6 +31,7 @@ ButtonEvent checkButtonEvent()
         if (reading == LOW) {
             if (pressStartTime == 0) {
                 pressStartTime = millis();
+                if (pressStartTime == 0) pressStartTime = 1;  // guard against millis() == 0 at rollover
                 longPressHandled = false;
             } else if (!longPressHandled && (millis() - pressStartTime >= LONG_PRESS_DURATION)) {
                 longPressHandled = true;

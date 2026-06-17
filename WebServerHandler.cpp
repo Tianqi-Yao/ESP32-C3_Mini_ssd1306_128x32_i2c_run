@@ -37,6 +37,7 @@ static void streamFileFed(File& file, const char* contentType) {
 }
 
 void handleFileDownload() {
+    if (!isStorageReady()) { server.send(503, "text/plain", "SD card not ready"); return; }
     if (!server.hasArg("path")) {
         server.send(400, "text/plain", "Missing 'path' parameter");
         return;
@@ -50,6 +51,7 @@ void handleFileDownload() {
     }
     File file = SD.open(path, FILE_READ);
     if (!file || file.isDirectory()) {
+        if (file) file.close();
         server.send(404, "text/plain", "File not found or is a directory");
         return;
     }
@@ -61,11 +63,17 @@ void handleFileDownload() {
 
 void listFilesRecursively(File dir, JsonArray arr, String path = "") {
     while (true) {
+        esp_task_wdt_reset();
         File entry = dir.openNextFile();
         if (!entry) break;
 
-        String name = entry.name();
+        String rawName = entry.name();
+        // Newer SD library versions return a full path (e.g. "/logs/file.csv") rather than a bare
+        // name; extract the final component so that name and fullPath are always consistent.
+        int slashIdx = rawName.lastIndexOf('/');
+        String name = (slashIdx >= 0) ? rawName.substring(slashIdx + 1) : rawName;
         // Skip hidden/metadata entries (macOS .Spotlight-V100, .fseventsd, ._*, .DS_Store, etc.)
+        // Check is done on the extracted basename so it works for both bare names and full paths.
         if (name.startsWith(".")) {
             entry.close();
             continue;
@@ -86,6 +94,7 @@ void listFilesRecursively(File dir, JsonArray arr, String path = "") {
 }
 
 void handleListFiles() {
+    if (!isStorageReady()) { server.send(503, "text/plain", "SD card not ready"); return; }
     JsonDocument doc;  // 7.x elastic document, grows as needed
     JsonArray root = doc.to<JsonArray>();
 
@@ -106,6 +115,7 @@ void handleListFiles() {
 }
 
 void handleReadFile() {
+    if (!isStorageReady()) { server.send(503, "text/plain", "SD card not ready"); return; }
     if (!server.hasArg("path")) {
         server.send(400, "text/plain", "Missing 'path' parameter");
         LOG("WebServer: Missing 'path' parameter for file read.");
@@ -120,6 +130,7 @@ void handleReadFile() {
     }
     File file = SD.open(path);
     if (!file || file.isDirectory()) {
+        if (file) file.close();
         server.send(404, "text/plain", "File not found or is a directory");
         LOG("WebServer: Invalid file or directory requested: " + path);
         return;
@@ -130,13 +141,24 @@ void handleReadFile() {
     file.close();
 }
 
+void handleSDReinit() {
+    bool ok = storageReinit();
+    server.send(200, "text/plain", ok ? "SD remounted OK" : "SD remount failed");
+    if (ok) LOG("SD remount triggered via web.");
+    else    Serial.println("SD remount failed via web.");
+}
+
 void handleRoot() {
     float temp = getTemperature();
     float hum = getHumidity();
     float batteryVoltage = readBatteryVoltage();
     int batteryPercent = getBatteryPercentage(batteryVoltage);
-    String timeStr = getRTCTimeString();
-    String html = sensorUI(temp, hum, batteryVoltage, batteryPercent, timeStr);
+    String timeStr = isRtcValid() ? getRTCTimeString() : String("N/A");
+    timeStr.replace("&", "&amp;");
+    timeStr.replace("<", "&lt;");
+    timeStr.replace(">", "&gt;");
+    bool sdReady = isStorageReady();
+    String html = sensorUI(temp, hum, batteryVoltage, batteryPercent, timeStr, sdReady);
     server.send(200, "text/html", html);
 }
 
@@ -147,13 +169,13 @@ void handleExit() {
 }
 
 void handlePowerOn() {
+    server.send(204);   // respond first so the browser doesn't wait through the relay delay
     powerOn();
-    server.send(204);
 }
 
 void handlePowerOff() {
-    powerOff();
     server.send(204);
+    powerOff();
 }
 
 void handleRTCSyncFromBrowser() {
@@ -174,21 +196,28 @@ void handleRTCSyncFromBrowser() {
     }
 
     String isoTime = doc["time"];
-    struct tm tm;
+    struct tm tmInfo;
     if (sscanf(isoTime.c_str(), "%4d-%2d-%2dT%2d:%2d:%2d",
-                &tm.tm_year, &tm.tm_mon, &tm.tm_mday,
-                &tm.tm_hour, &tm.tm_min, &tm.tm_sec) == 6)
+                &tmInfo.tm_year, &tmInfo.tm_mon, &tmInfo.tm_mday,
+                &tmInfo.tm_hour, &tmInfo.tm_min, &tmInfo.tm_sec) == 6)
     {
-        tm.tm_year -= 1900;
-        tm.tm_mon -= 1;
-        DateTime dt(
-            tm.tm_year + 1900,
-            tm.tm_mon + 1,
-            tm.tm_mday,
-            tm.tm_hour,
-            tm.tm_min,
-            tm.tm_sec
-        );
+        int year = tmInfo.tm_year;
+        int mon  = tmInfo.tm_mon;
+        static const int maxDay[] = {0,31,29,31,30,31,30,31,31,30,31,30,31};
+        bool isLeap = (year % 4 == 0 && (year % 100 != 0 || year % 400 == 0));
+        int dayLimit = (mon == 2 && !isLeap) ? 28 : maxDay[mon];
+        if (year < 2020 || year > 2099 ||
+            mon  < 1    || mon  > 12   ||
+            tmInfo.tm_mday < 1 || tmInfo.tm_mday > dayLimit ||
+            tmInfo.tm_hour < 0 || tmInfo.tm_hour > 23 ||
+            tmInfo.tm_min  < 0 || tmInfo.tm_min  > 59 ||
+            tmInfo.tm_sec  < 0 || tmInfo.tm_sec  > 59) {
+            server.send(400, "text/plain", "Time values out of range");
+            LOG("RTC sync failed: time values out of range.");
+            return;
+        }
+        DateTime dt(year, mon, tmInfo.tm_mday,
+                    tmInfo.tm_hour, tmInfo.tm_min, tmInfo.tm_sec);
         setRTC(dt);
         server.send(200, "text/plain", "RTC synchronized with phone time");
         LOG("RTC synchronized from browser.");
@@ -199,6 +228,7 @@ void handleRTCSyncFromBrowser() {
 }
 
 void handleFormatSDCard() {
+    if (!isStorageReady()) { server.send(503, "text/plain", "SD card not ready"); return; }
     File dir = SD.open("/logs");
     if (!dir || !dir.isDirectory()) {
         server.send(500, "text/plain", "Failed to open log directory");
@@ -206,26 +236,41 @@ void handleFormatSDCard() {
         return;
     }
 
-    int deleted = 0;
-    while (true) {
+    // Collect all file paths first, then close the directory before deleting.
+    // Mutating a directory while iterating it can cause the iterator to skip entries
+    // or read stale FAT data on some SD library versions.
+    // entry.name() may return a bare name or a full path depending on SD library version;
+    // use it as-is if it starts with '/', otherwise prepend /logs/.
+    const int MAX_LOG_FILES = 200;
+    String toDelete[MAX_LOG_FILES];
+    int fileCount = 0;
+    while (fileCount < MAX_LOG_FILES) {
         File entry = dir.openNextFile();
         if (!entry) break;
-
-        String name = entry.name();
         if (!entry.isDirectory()) {
-            String fullPath = String("/logs/") + name;
-            if (SD.remove(fullPath)) {
-                ++deleted;
-                LOG("Deleted file: " + fullPath);
-            } else {
-                LOG("Delete failed: " + fullPath);
-            }
+            String n = entry.name();
+            toDelete[fileCount++] = n.startsWith("/") ? n : (String("/logs/") + n);
         }
         entry.close();
     }
+    File extra = dir.openNextFile();
+    bool truncated = (fileCount == MAX_LOG_FILES) && extra;
+    if (extra) extra.close();
     dir.close();
 
+    int deleted = 0;
+    for (int i = 0; i < fileCount; i++) {
+        esp_task_wdt_reset();
+        if (SD.remove(toDelete[i])) {
+            ++deleted;
+            Serial.println("Deleted: " + toDelete[i]);
+        } else {
+            Serial.println("Delete failed: " + toDelete[i]);
+        }
+    }
+
     String msg = "Logs cleared, deleted " + String(deleted) + " file(s)";
+    if (truncated) msg += " (WARNING: too many files, some not deleted — run again)";
     LOG(msg);
     server.send(200, "text/plain", msg);
 }
@@ -242,14 +287,15 @@ void startWiFiAndWeb() {
     static bool routesRegistered = false;
     if (!routesRegistered) {
         server.on("/", handleRoot);
-        server.on("/exit", handleExit);
-        server.on("/power-on", handlePowerOn);
-        server.on("/power-off", handlePowerOff);
+        server.on("/exit",      HTTP_POST, handleExit);
+        server.on("/power-on",  HTTP_POST, handlePowerOn);
+        server.on("/power-off", HTTP_POST, handlePowerOff);
         server.on("/rtc-sync-browser", HTTP_POST, handleRTCSyncFromBrowser);
-        server.on("/files", handleListFiles);
-        server.on("/file", handleReadFile);
-        server.on("/format-sd", handleFormatSDCard);
+        server.on("/files",    handleListFiles);
+        server.on("/file",     handleReadFile);
+        server.on("/format-sd", HTTP_POST, handleFormatSDCard);
         server.on("/download", handleFileDownload);
+        server.on("/sd-reinit", HTTP_POST, handleSDReinit);
         routesRegistered = true;
     }
     server.begin();
@@ -277,9 +323,10 @@ bool shouldExitWiFiMode() {
 void blinkLED(int LED_PIN) {
     static unsigned long lastToggle = 0;
     static bool ledState = false;
-    if (millis() - lastToggle > 500) {
+    unsigned long t = millis();
+    if (t - lastToggle > 500) {
         ledState = !ledState;
         digitalWrite(LED_PIN, ledState ? HIGH : LOW);
-        lastToggle = millis();
+        lastToggle = t;
     }
 }
